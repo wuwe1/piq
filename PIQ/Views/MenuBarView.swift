@@ -3,6 +3,7 @@ import SwiftUI
 struct MenuBarView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.openWindow) private var openWindow
+    @State private var dropTargetPath: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -70,17 +71,45 @@ struct MenuBarView: View {
     }
 
     private var projectList: some View {
-        List {
-            ForEach(appState.projects) { project in
-                ProjectCardView(project: project)
-                    .listRowSeparator(.hidden)
-                    .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
+        ScrollView {
+            LazyVStack(spacing: 8) {
+                ForEach(appState.projects) { project in
+                    let path = project.rootPath.path(percentEncoded: false)
+                    ProjectCardView(project: project)
+                        .overlay(alignment: .top) {
+                            if dropTargetPath == path {
+                                RoundedRectangle(cornerRadius: 1)
+                                    .fill(Color.accentColor)
+                                    .frame(height: 2)
+                                    .offset(y: -5)
+                            }
+                        }
+                        .draggable(path) {
+                            Text(project.name)
+                                .font(.subheadline.bold())
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(.regularMaterial)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                        }
+                        .dropDestination(for: String.self) { items, _ in
+                            dropTargetPath = nil
+                            guard let draggedPath = items.first, draggedPath != path else { return false }
+                            appState.moveProject(from: draggedPath, to: path)
+                            return true
+                        } isTargeted: { targeted in
+                            if targeted {
+                                dropTargetPath = path
+                            } else if dropTargetPath == path {
+                                dropTargetPath = nil
+                            }
+                        }
+                }
             }
-            .onMove { source, destination in
-                appState.moveProjects(from: source, to: destination)
-            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .animation(.easeInOut(duration: 0.15), value: dropTargetPath)
         }
-        .listStyle(.plain)
     }
 
     // MARK: - Footer

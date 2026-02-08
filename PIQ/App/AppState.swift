@@ -71,9 +71,16 @@ final class AppState {
         checkNotifications(oldProjects: oldProjects)
     }
 
-    /// Move projects from one set of indices to a new position and persist the order.
-    func moveProjects(from source: IndexSet, to destination: Int) {
-        projects.move(fromOffsets: source, toOffset: destination)
+    /// Move a project from one position to another by path and persist the order.
+    func moveProject(from sourcePath: String, to targetPath: String) {
+        guard let sourceIndex = projects.firstIndex(where: { $0.rootPath.path(percentEncoded: false) == sourcePath }),
+              let targetIndex = projects.firstIndex(where: { $0.rootPath.path(percentEncoded: false) == targetPath }),
+              sourceIndex != targetIndex else {
+            return
+        }
+        let project = projects.remove(at: sourceIndex)
+        let adjustedTarget = sourceIndex < targetIndex ? targetIndex - 1 : targetIndex
+        projects.insert(project, at: adjustedTarget)
         projectConfig.projectOrder = projects.map { $0.rootPath.path(percentEncoded: false) }
         saveProjectConfig()
     }
