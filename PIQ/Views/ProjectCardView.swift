@@ -19,11 +19,26 @@ struct ProjectCardView: View {
     }
 
     var body: some View {
-        DisclosureGroup(isExpanded: isExpanded) {
-            ProjectDetailView(project: project)
-                .padding(.top, 4)
-        } label: {
-            cardLabel
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.right")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(isExpanded.wrappedValue ? 90 : 0))
+                    .animation(.easeInOut(duration: 0.15), value: isExpanded.wrappedValue)
+
+                cardLabel
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                isExpanded.wrappedValue.toggle()
+            }
+
+            if isExpanded.wrappedValue {
+                ProjectDetailView(project: project)
+                    .padding(.top, 8)
+                    .padding(.leading, 16)
+            }
         }
         .padding(10)
         .background(Color.primary.opacity(0.04))
