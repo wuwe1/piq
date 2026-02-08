@@ -9,6 +9,7 @@ struct EpicItem: Identifiable, Codable, Sendable {
     let created: Date
     let updated: Date
     let progress: Int
+    let github: URL?
     var actualTasksDone: Int
     var tasks: [TaskItem]
 
@@ -21,6 +22,7 @@ struct EpicItem: Identifiable, Codable, Sendable {
         created: Date = Date(),
         updated: Date = Date(),
         progress: Int = 0,
+        github: URL? = nil,
         actualTasksDone: Int = 0,
         tasks: [TaskItem] = []
     ) {
@@ -32,6 +34,7 @@ struct EpicItem: Identifiable, Codable, Sendable {
         self.created = created
         self.updated = updated
         self.progress = progress
+        self.github = github
         self.actualTasksDone = actualTasksDone
         self.tasks = tasks
     }

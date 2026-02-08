@@ -11,6 +11,13 @@ struct MenuBarView: View {
             Divider()
             footer
         }
+        .overlay(alignment: .bottom) {
+            if let message = appState.toastMessage {
+                ToastView(message: message)
+                    .padding(.bottom, 40)
+                    .animation(.easeInOut(duration: 0.2), value: appState.toastMessage)
+            }
+        }
         .task {
             appState.rescanAll()
         }

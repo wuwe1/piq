@@ -187,6 +187,10 @@ enum FrontmatterParser {
         let created = parseDate(fm["created"])
         let updated = parseDate(fm["updated"])
 
+        let github = fm["github"]?.stringValue.flatMap { str in
+            str.isEmpty ? nil : URL(string: str)
+        }
+
         return .epic(EpicItem(
             name: name,
             description: description,
@@ -194,7 +198,8 @@ enum FrontmatterParser {
             filePath: filePath,
             created: created,
             updated: updated,
-            progress: progress
+            progress: progress,
+            github: github
         ))
     }
 
@@ -207,12 +212,17 @@ enum FrontmatterParser {
         let updated = parseDate(fm["updated"])
         let taskID = filePath.deletingPathExtension().lastPathComponent
 
+        let github = fm["github"]?.stringValue.flatMap { str in
+            str.isEmpty ? nil : URL(string: str)
+        }
+
         return .task(TaskItem(
             taskID: taskID,
             name: name,
             description: description,
             status: status,
             filePath: filePath,
+            github: github,
             created: created,
             updated: updated
         ))

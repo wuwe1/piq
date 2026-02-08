@@ -7,6 +7,7 @@ struct TaskItem: Identifiable, Codable, Sendable {
     let description: String
     let status: ItemStatus
     let filePath: URL
+    let github: URL?
     let created: Date
     let updated: Date
 
@@ -17,6 +18,7 @@ struct TaskItem: Identifiable, Codable, Sendable {
         description: String = "",
         status: ItemStatus = .open,
         filePath: URL,
+        github: URL? = nil,
         created: Date = Date(),
         updated: Date = Date()
     ) {
@@ -26,6 +28,7 @@ struct TaskItem: Identifiable, Codable, Sendable {
         self.description = description
         self.status = status
         self.filePath = filePath
+        self.github = github
         self.created = created
         self.updated = updated
     }

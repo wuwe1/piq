@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ProjectCardView: View {
     let project: Project
+    @Environment(AppState.self) private var appState
     @State private var isExpanded = false
 
     var body: some View {
@@ -14,6 +15,7 @@ struct ProjectCardView: View {
         .padding(10)
         .background(Color.primary.opacity(0.04))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .contextMenu { projectContextMenu }
     }
 
     private var cardLabel: some View {
@@ -32,8 +34,68 @@ struct ProjectCardView: View {
             if totalTaskCount > 0 {
                 ProgressBarView(value: overallPercent, total: totalTaskCount)
             }
+
+            actionBar
         }
     }
+
+    // MARK: - Action Bar
+
+    private var actionBar: some View {
+        HStack(spacing: 8) {
+            actionButton("terminal", icon: "terminal") {
+                ActionService.openTerminal(at: project.rootPath)
+                appState.showToast("Opened Terminal")
+            }
+            actionButton("claude", icon: "chevron.left.forwardslash.chevron.right") {
+                ActionService.openClaudeCode(at: project.rootPath)
+                appState.showToast("Opened Claude Code")
+            }
+            actionButton("copy", icon: "doc.on.doc") {
+                let summary = ActionService.projectStatusSummary(project)
+                ActionService.copyToClipboard(summary)
+                appState.showToast("Copied status")
+            }
+            Spacer()
+        }
+    }
+
+    private func actionButton(_ label: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.caption2)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .help(label)
+    }
+
+    // MARK: - Context Menu
+
+    @ViewBuilder
+    private var projectContextMenu: some View {
+        Button("Copy cd command") {
+            ActionService.copyToClipboard("cd \(project.rootPath.path(percentEncoded: false))")
+            appState.showToast("Copied cd command")
+        }
+        Button("Show in Finder") {
+            ActionService.showInFinder(project.rootPath)
+        }
+        Button("Open Terminal") {
+            ActionService.openTerminal(at: project.rootPath)
+        }
+        Button("Open Claude Code") {
+            ActionService.openClaudeCode(at: project.rootPath)
+        }
+        Divider()
+        Button("Copy Status") {
+            let summary = ActionService.projectStatusSummary(project)
+            ActionService.copyToClipboard(summary)
+            appState.showToast("Copied status")
+        }
+    }
+
+    // MARK: - Stats
 
     private func statLabel(count: Int, label: String, icon: String) -> some View {
         HStack(spacing: 3) {

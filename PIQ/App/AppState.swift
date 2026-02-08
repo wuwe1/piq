@@ -7,6 +7,7 @@ final class AppState {
     var projects: [Project] = []
     var projectConfig: ProjectConfig = ProjectConfig()
     var selectedProjectID: UUID?
+    var toastMessage: String?
     var activityStore: ActivityStore?
     private var fileWatcher: FileWatcher?
 
@@ -44,6 +45,14 @@ final class AppState {
         let store = ActivityStore(storageURL: activityFileURL)
         store.loadHistory()
         activityStore = store
+    }
+
+    func showToast(_ message: String) {
+        toastMessage = message
+        Task {
+            try? await Task.sleep(for: .seconds(1.5))
+            toastMessage = nil
+        }
     }
 
     func addScanRoot(_ root: URL) {

@@ -31,6 +31,8 @@
 		A1000022 /* ProgressBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000029 /* ProgressBarView.swift */; };
 		A1000023 /* ActivityStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000030 /* ActivityStore.swift */; };
 		A1000024 /* ActivityStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000031 /* ActivityStoreTests.swift */; };
+		A1000025 /* ActionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000032 /* ActionService.swift */; };
+		A1000026 /* ToastView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000033 /* ToastView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -71,6 +73,8 @@
 		A2000029 /* ProgressBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressBarView.swift; sourceTree = "<group>"; };
 		A2000030 /* ActivityStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityStore.swift; sourceTree = "<group>"; };
 		A2000031 /* ActivityStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityStoreTests.swift; sourceTree = "<group>"; };
+		A2000032 /* ActionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionService.swift; sourceTree = "<group>"; };
+		A2000033 /* ToastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToastView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -131,6 +135,7 @@
 				A2000027 /* ProjectDetailView.swift */,
 				A2000028 /* StatusBadge.swift */,
 				A2000029 /* ProgressBarView.swift */,
+				A2000033 /* ToastView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -152,6 +157,7 @@
 		A4000005 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				A2000032 /* ActionService.swift */,
 				A2000030 /* ActivityStore.swift */,
 				A2000024 /* FileWatcher.swift */,
 				A2000017 /* FrontmatterParser.swift */,
@@ -306,6 +312,8 @@
 				A1000021 /* StatusBadge.swift in Sources */,
 				A1000022 /* ProgressBarView.swift in Sources */,
 				A1000023 /* ActivityStore.swift in Sources */,
+				A1000025 /* ActionService.swift in Sources */,
+				A1000026 /* ToastView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
