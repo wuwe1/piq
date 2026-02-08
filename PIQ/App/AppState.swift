@@ -6,6 +6,7 @@ final class AppState {
     private let configDirectory: URL
     var projects: [Project] = []
     var projectConfig: ProjectConfig = ProjectConfig()
+    private var fileWatcher: FileWatcher?
 
     private var configFileURL: URL {
         configDirectory.appending(path: "projects.json")
@@ -24,6 +25,7 @@ final class AppState {
     func rescanAll() {
         projects = ProjectStore.scanAll(configURL: configFileURL)
         projectConfig = ProjectStore.loadConfig(from: configFileURL)
+        updateWatchedPaths()
     }
 
     func addScanRoot(_ root: URL) {
@@ -34,6 +36,33 @@ final class AppState {
     func addManualProject(_ path: URL) {
         ProjectStore.addManualProject(path: path, to: &projectConfig)
         ProjectStore.saveConfig(projectConfig, to: configFileURL)
+    }
+
+    // MARK: - File Watching
+
+    /// Create a FileWatcher, collect project paths, and start monitoring for changes.
+    func startWatching() {
+        let watcher = FileWatcher { [weak self] in
+            self?.rescanAll()
+        }
+        fileWatcher = watcher
+
+        let paths = projects.map(\.rootPath)
+        watcher.startWatching(paths: paths)
+    }
+
+    /// Stop the FileWatcher and release resources.
+    func stopWatching() {
+        fileWatcher?.stopWatching()
+        fileWatcher = nil
+    }
+
+    // MARK: - Private
+
+    /// Update the FileWatcher's monitored paths based on the current project list.
+    private func updateWatchedPaths() {
+        let paths = projects.map(\.rootPath)
+        fileWatcher?.updatePaths(paths)
     }
 
     private func createConfigDirectoryIfNeeded() {
