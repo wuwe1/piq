@@ -11,7 +11,25 @@
 		A1000002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000002 /* AppState.swift */; };
 		A1000003 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000003 /* MenuBarView.swift */; };
 		A1000004 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000004 /* Assets.xcassets */; };
+		A1000005 /* ItemStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000011 /* ItemStatus.swift */; };
+		A1000006 /* Project.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000012 /* Project.swift */; };
+		A1000007 /* PRDItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000013 /* PRDItem.swift */; };
+		A1000008 /* EpicItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000014 /* EpicItem.swift */; };
+		A1000009 /* TaskItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000015 /* TaskItem.swift */; };
+		A1000010 /* ActivityEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000016 /* ActivityEvent.swift */; };
+		A1000011 /* FrontmatterParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000017 /* FrontmatterParser.swift */; };
+		A1000012 /* FrontmatterParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000018 /* FrontmatterParserTests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		AA000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A8000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A5000001;
+			remoteInfo = PIQ;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		A2000001 /* PIQApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PIQApp.swift; sourceTree = "<group>"; };
@@ -20,10 +38,26 @@
 		A2000004 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A2000005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A2000010 /* PIQ.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PIQ.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A2000011 /* ItemStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemStatus.swift; sourceTree = "<group>"; };
+		A2000012 /* Project.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Project.swift; sourceTree = "<group>"; };
+		A2000013 /* PRDItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PRDItem.swift; sourceTree = "<group>"; };
+		A2000014 /* EpicItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpicItem.swift; sourceTree = "<group>"; };
+		A2000015 /* TaskItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskItem.swift; sourceTree = "<group>"; };
+		A2000016 /* ActivityEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityEvent.swift; sourceTree = "<group>"; };
+		A2000017 /* FrontmatterParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrontmatterParser.swift; sourceTree = "<group>"; };
+		A2000018 /* FrontmatterParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrontmatterParserTests.swift; sourceTree = "<group>"; };
+		A2000019 /* PIQTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PIQTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		A3000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A3000002 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -37,6 +71,7 @@
 			isa = PBXGroup;
 			children = (
 				A4000001 /* PIQ */,
+				A4000008 /* PIQTests */,
 				A4000099 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -75,6 +110,12 @@
 		A4000004 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				A2000011 /* ItemStatus.swift */,
+				A2000012 /* Project.swift */,
+				A2000013 /* PRDItem.swift */,
+				A2000014 /* EpicItem.swift */,
+				A2000015 /* TaskItem.swift */,
+				A2000016 /* ActivityEvent.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -82,6 +123,7 @@
 		A4000005 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				A2000017 /* FrontmatterParser.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -101,10 +143,19 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
+		A4000008 /* PIQTests */ = {
+			isa = PBXGroup;
+			children = (
+				A2000018 /* FrontmatterParserTests.swift */,
+			);
+			path = PIQTests;
+			sourceTree = "<group>";
+		};
 		A4000099 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				A2000010 /* PIQ.app */,
+				A2000019 /* PIQTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -129,6 +180,23 @@
 			productReference = A2000010 /* PIQ.app */;
 			productType = "com.apple.product-type.application";
 		};
+		A5000002 /* PIQTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A7000003 /* Build configuration list for PBXNativeTarget "PIQTests" */;
+			buildPhases = (
+				A6000003 /* Sources */,
+				A3000002 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AB000001 /* PBXTargetDependency */,
+			);
+			name = PIQTests;
+			productName = PIQTests;
+			productReference = A2000019 /* PIQTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -141,6 +209,10 @@
 				TargetAttributes = {
 					A5000001 = {
 						CreatedOnToolsVersion = 16.0;
+					};
+					A5000002 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = A5000001;
 					};
 				};
 			};
@@ -158,6 +230,7 @@
 			projectRoot = "";
 			targets = (
 				A5000001 /* PIQ */,
+				A5000002 /* PIQTests */,
 			);
 		};
 /* End PBXProject section */
@@ -181,10 +254,33 @@
 				A1000001 /* PIQApp.swift in Sources */,
 				A1000002 /* AppState.swift in Sources */,
 				A1000003 /* MenuBarView.swift in Sources */,
+				A1000005 /* ItemStatus.swift in Sources */,
+				A1000006 /* Project.swift in Sources */,
+				A1000007 /* PRDItem.swift in Sources */,
+				A1000008 /* EpicItem.swift in Sources */,
+				A1000009 /* TaskItem.swift in Sources */,
+				A1000010 /* ActivityEvent.swift in Sources */,
+				A1000011 /* FrontmatterParser.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A6000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1000012 /* FrontmatterParserTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		AB000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A5000001 /* PIQ */;
+			targetProxy = AA000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		A9000001 /* Debug */ = {
@@ -346,6 +442,42 @@
 			};
 			name = Release;
 		};
+		A9000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.piq.PIQTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PIQ.app/Contents/MacOS/PIQ";
+			};
+			name = Debug;
+		};
+		A9000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.piq.PIQTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PIQ.app/Contents/MacOS/PIQ";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -363,6 +495,15 @@
 			buildConfigurations = (
 				A9000001 /* Debug */,
 				A9000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A7000003 /* Build configuration list for PBXNativeTarget "PIQTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A9000005 /* Debug */,
+				A9000006 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
