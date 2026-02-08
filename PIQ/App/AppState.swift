@@ -65,9 +65,51 @@ final class AppState {
         let oldProjects = projects
         projects = ProjectStore.scanAll(configURL: configFileURL)
         projectConfig = ProjectStore.loadConfig(from: configFileURL)
+        reorderProjects()
         updateWatchedPaths()
         activityStore?.processChanges(projects: projects)
         checkNotifications(oldProjects: oldProjects)
+    }
+
+    /// Move projects from one set of indices to a new position and persist the order.
+    func moveProjects(from source: IndexSet, to destination: Int) {
+        projects.move(fromOffsets: source, toOffset: destination)
+        projectConfig.projectOrder = projects.map { $0.rootPath.path(percentEncoded: false) }
+        saveProjectConfig()
+    }
+
+    /// Reorder projects to match the persisted `projectOrder`.
+    /// Projects not in the order are appended at the end.
+    /// Stale entries (paths no longer present) are removed from the order.
+    private func reorderProjects() {
+        let order = projectConfig.projectOrder
+        guard !order.isEmpty else { return }
+
+        let pathToIndex: [String: Int] = {
+            var map: [String: Int] = [:]
+            for (i, path) in order.enumerated() {
+                map[path] = i
+            }
+            return map
+        }()
+
+        let ordered = projects.filter { pathToIndex[$0.rootPath.path(percentEncoded: false)] != nil }
+            .sorted { a, b in
+                let ai = pathToIndex[a.rootPath.path(percentEncoded: false)] ?? Int.max
+                let bi = pathToIndex[b.rootPath.path(percentEncoded: false)] ?? Int.max
+                return ai < bi
+            }
+        let unordered = projects.filter { pathToIndex[$0.rootPath.path(percentEncoded: false)] == nil }
+
+        projects = ordered + unordered
+
+        // Clean up stale entries from projectOrder
+        let currentPaths = Set(projects.map { $0.rootPath.path(percentEncoded: false) })
+        let cleanedOrder = projectConfig.projectOrder.filter { currentPaths.contains($0) }
+        if cleanedOrder.count != projectConfig.projectOrder.count {
+            projectConfig.projectOrder = cleanedOrder
+            saveProjectConfig()
+        }
     }
 
     func setupActivityStore() {

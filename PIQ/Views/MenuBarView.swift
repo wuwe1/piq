@@ -70,15 +70,17 @@ struct MenuBarView: View {
     }
 
     private var projectList: some View {
-        ScrollView {
-            LazyVStack(spacing: 8) {
-                ForEach(appState.projects) { project in
-                    ProjectCardView(project: project)
-                }
+        List {
+            ForEach(appState.projects) { project in
+                ProjectCardView(project: project)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .onMove { source, destination in
+                appState.moveProjects(from: source, to: destination)
+            }
         }
+        .listStyle(.plain)
     }
 
     // MARK: - Footer
