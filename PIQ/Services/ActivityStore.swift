@@ -95,6 +95,25 @@ final class ActivityStore {
         return durations.reduce(0, +) / Double(durations.count)
     }
 
+    /// Per-day task completion counts for the last N days, including days with 0 completions.
+    func tasksCompletedPerDay(lastDays: Int) -> [(date: Date, count: Int)] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+
+        // Build a dictionary of day -> count for .done task events
+        var countByDay: [Date: Int] = [:]
+        for event in events where event.itemType == .task && event.newStatus == .done {
+            let day = calendar.startOfDay(for: event.timestamp)
+            countByDay[day, default: 0] += 1
+        }
+
+        // Return continuous range including days with 0
+        return (0..<lastDays).compactMap { offset -> (date: Date, count: Int)? in
+            guard let day = calendar.date(byAdding: .day, value: -offset, to: today) else { return nil }
+            return (date: day, count: countByDay[day] ?? 0)
+        }.reversed()
+    }
+
     /// Calculate how many tasks were completed in the last N days.
     func tasksCompleted(inLastDays days: Int) -> Int {
         let cutoff = Date().addingTimeInterval(-Double(days) * 86400)
