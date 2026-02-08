@@ -3,10 +3,23 @@ import SwiftUI
 struct ProjectCardView: View {
     let project: Project
     @Environment(AppState.self) private var appState
-    @State private var isExpanded = false
+
+    private var isExpanded: Binding<Bool> {
+        let key = project.rootPath.path(percentEncoded: false)
+        return Binding(
+            get: { appState.expandedProjectPaths.contains(key) },
+            set: { newValue in
+                if newValue {
+                    appState.expandedProjectPaths.insert(key)
+                } else {
+                    appState.expandedProjectPaths.remove(key)
+                }
+            }
+        )
+    }
 
     var body: some View {
-        DisclosureGroup(isExpanded: $isExpanded) {
+        DisclosureGroup(isExpanded: isExpanded) {
             ProjectDetailView(project: project)
                 .padding(.top, 4)
         } label: {

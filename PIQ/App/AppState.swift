@@ -7,6 +7,7 @@ final class AppState {
     var projects: [Project] = []
     var projectConfig: ProjectConfig = ProjectConfig()
     var selectedProjectID: UUID?
+    var expandedProjectPaths: Set<String> = []
     var toastMessage: String?
     var activityStore: ActivityStore?
     private var fileWatcher: FileWatcher?
