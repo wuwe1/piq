@@ -1,11 +1,11 @@
 ---
 name: draggable-projects
-status: backlog
+status: done
 created: 2026-02-08T12:00:25Z
-updated: 2026-02-08T12:03:36Z
-progress: 0%
+updated: 2026-02-08T12:12:45Z
+progress: 100%
 task_count: 1
-tasks_done: 0
+tasks_done: 1
 prd: .claude/prds/draggable-projects.md
 github: https://github.com/wuwe1/piq/issues/11
 ---
@@ -55,7 +55,7 @@ github: https://github.com/wuwe1/piq/issues/11
 
 ## 已创建的任务
 
-- [ ] #12 - 实现项目拖拽排序与顺序持久化 (parallel: false)
+- [x] #12 - 实现项目拖拽排序与顺序持久化 (parallel: false)
 
 总任务数：1
 并行任务数：0
