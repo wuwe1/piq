@@ -7,13 +7,16 @@ struct MenuBarView: View {
         VStack(spacing: 0) {
             header
             Divider()
-            emptyState
-            Spacer()
+            content
             Divider()
             footer
         }
-        .padding()
+        .task {
+            appState.rescanAll()
+        }
     }
+
+    // MARK: - Header
 
     private var header: some View {
         HStack {
@@ -22,8 +25,23 @@ struct MenuBarView: View {
             Text("PIQ")
                 .font(.headline)
             Spacer()
+            Text("\(appState.projects.count) projects")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
         }
-        .padding(.bottom, 8)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+
+    // MARK: - Content
+
+    @ViewBuilder
+    private var content: some View {
+        if appState.projects.isEmpty {
+            emptyState
+        } else {
+            projectList
+        }
     }
 
     private var emptyState: some View {
@@ -35,14 +53,41 @@ struct MenuBarView: View {
             Text("No projects")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+            Text("Add a scan root via config")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
             Spacer()
         }
         .frame(maxWidth: .infinity)
     }
 
+    private var projectList: some View {
+        ScrollView {
+            LazyVStack(spacing: 8) {
+                ForEach(appState.projects) { project in
+                    ProjectCardView(project: project)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+        }
+    }
+
+    // MARK: - Footer
+
     private var footer: some View {
         HStack {
+            Button {
+                appState.rescanAll()
+            } label: {
+                Label("Refresh", systemImage: "arrow.clockwise")
+                    .font(.footnote)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+
             Spacer()
+
             Button("Quit") {
                 NSApplication.shared.terminate(nil)
             }
@@ -50,6 +95,7 @@ struct MenuBarView: View {
             .foregroundStyle(.secondary)
             .font(.footnote)
         }
-        .padding(.top, 8)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 }

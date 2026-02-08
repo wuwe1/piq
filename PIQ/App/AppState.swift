@@ -6,10 +6,21 @@ final class AppState {
     private let configDirectory: URL
     var projects: [Project] = []
     var projectConfig: ProjectConfig = ProjectConfig()
+    var selectedProjectID: UUID?
+    var activityStore: ActivityStore?
     private var fileWatcher: FileWatcher?
+
+    var selectedProject: Project? {
+        guard let id = selectedProjectID else { return nil }
+        return projects.first { $0.id == id }
+    }
 
     private var configFileURL: URL {
         configDirectory.appending(path: "projects.json")
+    }
+
+    private var activityFileURL: URL {
+        configDirectory.appending(path: "activity.json")
     }
 
     init() {
@@ -26,6 +37,13 @@ final class AppState {
         projects = ProjectStore.scanAll(configURL: configFileURL)
         projectConfig = ProjectStore.loadConfig(from: configFileURL)
         updateWatchedPaths()
+        activityStore?.processChanges(projects: projects)
+    }
+
+    func setupActivityStore() {
+        let store = ActivityStore(storageURL: activityFileURL)
+        store.loadHistory()
+        activityStore = store
     }
 
     func addScanRoot(_ root: URL) {

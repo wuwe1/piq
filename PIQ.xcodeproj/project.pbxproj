@@ -25,6 +25,12 @@
 		A1000016 /* ProjectScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000023 /* ProjectScannerTests.swift */; };
 		A1000017 /* FileWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000024 /* FileWatcher.swift */; };
 		A1000018 /* FileWatcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000025 /* FileWatcherTests.swift */; };
+		A1000019 /* ProjectCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000026 /* ProjectCardView.swift */; };
+		A1000020 /* ProjectDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000027 /* ProjectDetailView.swift */; };
+		A1000021 /* StatusBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000028 /* StatusBadge.swift */; };
+		A1000022 /* ProgressBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000029 /* ProgressBarView.swift */; };
+		A1000023 /* ActivityStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000030 /* ActivityStore.swift */; };
+		A1000024 /* ActivityStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000031 /* ActivityStoreTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -59,6 +65,12 @@
 		A2000023 /* ProjectScannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectScannerTests.swift; sourceTree = "<group>"; };
 		A2000024 /* FileWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileWatcher.swift; sourceTree = "<group>"; };
 		A2000025 /* FileWatcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileWatcherTests.swift; sourceTree = "<group>"; };
+		A2000026 /* ProjectCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectCardView.swift; sourceTree = "<group>"; };
+		A2000027 /* ProjectDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectDetailView.swift; sourceTree = "<group>"; };
+		A2000028 /* StatusBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBadge.swift; sourceTree = "<group>"; };
+		A2000029 /* ProgressBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressBarView.swift; sourceTree = "<group>"; };
+		A2000030 /* ActivityStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityStore.swift; sourceTree = "<group>"; };
+		A2000031 /* ActivityStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityStoreTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -115,6 +127,10 @@
 			isa = PBXGroup;
 			children = (
 				A2000003 /* MenuBarView.swift */,
+				A2000026 /* ProjectCardView.swift */,
+				A2000027 /* ProjectDetailView.swift */,
+				A2000028 /* StatusBadge.swift */,
+				A2000029 /* ProgressBarView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -136,6 +152,7 @@
 		A4000005 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				A2000030 /* ActivityStore.swift */,
 				A2000024 /* FileWatcher.swift */,
 				A2000017 /* FrontmatterParser.swift */,
 				A2000021 /* ProjectScanner.swift */,
@@ -162,6 +179,7 @@
 		A4000008 /* PIQTests */ = {
 			isa = PBXGroup;
 			children = (
+				A2000031 /* ActivityStoreTests.swift */,
 				A2000018 /* FrontmatterParserTests.swift */,
 				A2000025 /* FileWatcherTests.swift */,
 				A2000023 /* ProjectScannerTests.swift */,
@@ -283,6 +301,11 @@
 				A1000014 /* ProjectScanner.swift in Sources */,
 				A1000015 /* ProjectStore.swift in Sources */,
 				A1000017 /* FileWatcher.swift in Sources */,
+				A1000019 /* ProjectCardView.swift in Sources */,
+				A1000020 /* ProjectDetailView.swift in Sources */,
+				A1000021 /* StatusBadge.swift in Sources */,
+				A1000022 /* ProgressBarView.swift in Sources */,
+				A1000023 /* ActivityStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -293,6 +316,7 @@
 				A1000012 /* FrontmatterParserTests.swift in Sources */,
 				A1000016 /* ProjectScannerTests.swift in Sources */,
 				A1000018 /* FileWatcherTests.swift in Sources */,
+				A1000024 /* ActivityStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
