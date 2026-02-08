@@ -33,6 +33,10 @@
 		A1000024 /* ActivityStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000031 /* ActivityStoreTests.swift */; };
 		A1000025 /* ActionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000032 /* ActionService.swift */; };
 		A1000026 /* ToastView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000033 /* ToastView.swift */; };
+		A1000027 /* Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000034 /* Settings.swift */; };
+		A1000028 /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000035 /* SettingsStore.swift */; };
+		A1000029 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000036 /* NotificationService.swift */; };
+		A1000030 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000037 /* SettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -75,6 +79,10 @@
 		A2000031 /* ActivityStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityStoreTests.swift; sourceTree = "<group>"; };
 		A2000032 /* ActionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionService.swift; sourceTree = "<group>"; };
 		A2000033 /* ToastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToastView.swift; sourceTree = "<group>"; };
+		A2000034 /* Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings.swift; sourceTree = "<group>"; };
+		A2000035 /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStore.swift; sourceTree = "<group>"; };
+		A2000036 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		A2000037 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -133,6 +141,7 @@
 				A2000003 /* MenuBarView.swift */,
 				A2000026 /* ProjectCardView.swift */,
 				A2000027 /* ProjectDetailView.swift */,
+				A2000037 /* SettingsView.swift */,
 				A2000028 /* StatusBadge.swift */,
 				A2000029 /* ProgressBarView.swift */,
 				A2000033 /* ToastView.swift */,
@@ -150,6 +159,7 @@
 				A2000015 /* TaskItem.swift */,
 				A2000016 /* ActivityEvent.swift */,
 				A2000020 /* ProjectConfig.swift */,
+				A2000034 /* Settings.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -161,8 +171,10 @@
 				A2000030 /* ActivityStore.swift */,
 				A2000024 /* FileWatcher.swift */,
 				A2000017 /* FrontmatterParser.swift */,
+				A2000036 /* NotificationService.swift */,
 				A2000021 /* ProjectScanner.swift */,
 				A2000022 /* ProjectStore.swift */,
+				A2000035 /* SettingsStore.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -314,6 +326,10 @@
 				A1000023 /* ActivityStore.swift in Sources */,
 				A1000025 /* ActionService.swift in Sources */,
 				A1000026 /* ToastView.swift in Sources */,
+				A1000027 /* Settings.swift in Sources */,
+				A1000028 /* SettingsStore.swift in Sources */,
+				A1000029 /* NotificationService.swift in Sources */,
+				A1000030 /* SettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

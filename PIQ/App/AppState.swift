@@ -6,11 +6,21 @@ final class AppState {
     private let configDirectory: URL
     var projects: [Project] = []
     var projectConfig: ProjectConfig = ProjectConfig()
+    var settings: Settings = Settings()
     var selectedProjectID: UUID?
     var expandedProjectPaths: Set<String> = []
     var toastMessage: String?
     var activityStore: ActivityStore?
     private var fileWatcher: FileWatcher?
+
+    /// Snapshot of epic progress percentages from the previous scan, keyed by file path.
+    private var epicProgressSnapshot: [String: Int] = [:]
+
+    /// Snapshot of known PRD names from the previous scan.
+    private var knownPRDNames: Set<String> = []
+
+    /// Snapshot of known epic file paths for inconsistency tracking.
+    private var knownInconsistentEpics: Set<String> = []
 
     var selectedProject: Project? {
         guard let id = selectedProjectID else { return nil }
@@ -25,6 +35,10 @@ final class AppState {
         configDirectory.appending(path: "activity.json")
     }
 
+    var settingsFileURL: URL {
+        configDirectory.appending(path: "settings.json")
+    }
+
     init() {
         let home = FileManager.default.homeDirectoryForCurrentUser
         configDirectory = home.appending(path: ".piq", directoryHint: .isDirectory)
@@ -35,11 +49,25 @@ final class AppState {
         projectConfig = ProjectStore.loadConfig(from: configFileURL)
     }
 
+    func loadSettings() {
+        settings = SettingsStore.load(from: settingsFileURL)
+    }
+
+    func saveSettings() {
+        SettingsStore.save(settings, to: settingsFileURL)
+    }
+
+    func saveProjectConfig() {
+        ProjectStore.saveConfig(projectConfig, to: configFileURL)
+    }
+
     func rescanAll() {
+        let oldProjects = projects
         projects = ProjectStore.scanAll(configURL: configFileURL)
         projectConfig = ProjectStore.loadConfig(from: configFileURL)
         updateWatchedPaths()
         activityStore?.processChanges(projects: projects)
+        checkNotifications(oldProjects: oldProjects)
     }
 
     func setupActivityStore() {
@@ -98,5 +126,49 @@ final class AppState {
         if !fm.fileExists(atPath: configDirectory.path(percentEncoded: false)) {
             try? fm.createDirectory(at: configDirectory, withIntermediateDirectories: true)
         }
+    }
+
+    // MARK: - Notification Checks
+
+    /// Compare current scan results against previous snapshots and send notifications.
+    private func checkNotifications(oldProjects: [Project]) {
+        let currentSettings = settings
+
+        // Gather all epics and PRDs from the new scan
+        let allEpics = projects.flatMap(\.epics)
+        let allPRDs = projects.flatMap(\.prds)
+
+        // Check epic milestones
+        for epic in allEpics {
+            let key = epic.filePath.path(percentEncoded: false)
+            let oldProgress = epicProgressSnapshot[key] ?? 0
+            NotificationService.checkMilestone(epic: epic, oldProgress: oldProgress, settings: currentSettings)
+        }
+
+        // Check for new PRDs
+        let currentPRDNames = Set(allPRDs.map(\.name))
+        let newPRDNames = currentPRDNames.subtracting(knownPRDNames)
+        if !knownPRDNames.isEmpty {
+            for name in newPRDNames {
+                NotificationService.notifyNewPRD(name: name, settings: currentSettings)
+            }
+        }
+
+        // Check for inconsistencies
+        for epic in allEpics {
+            let key = epic.filePath.path(percentEncoded: false)
+            if !epic.isConsistent && !knownInconsistentEpics.contains(key) {
+                NotificationService.notifyInconsistency(epic: epic, settings: currentSettings)
+            }
+        }
+
+        // Update snapshots
+        epicProgressSnapshot = [:]
+        for epic in allEpics {
+            let key = epic.filePath.path(percentEncoded: false)
+            epicProgressSnapshot[key] = epic.progressPercent
+        }
+        knownPRDNames = currentPRDNames
+        knownInconsistentEpics = Set(allEpics.filter { !$0.isConsistent }.map { $0.filePath.path(percentEncoded: false) })
     }
 }

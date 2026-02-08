@@ -9,7 +9,18 @@ struct PIQApp: App {
             MenuBarView()
                 .environment(appState)
                 .frame(width: 360, height: 500)
+                .task {
+                    appState.loadSettings()
+                    NotificationService.requestPermission()
+                }
         }
         .menuBarExtraStyle(.window)
+
+        Window("PIQ Settings", id: "settings") {
+            SettingsView()
+                .environment(appState)
+        }
+        .defaultSize(width: 480, height: 360)
+        .windowResizability(.contentSize)
     }
 }

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MenuBarView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(spacing: 0) {
@@ -94,6 +95,17 @@ struct MenuBarView: View {
             .foregroundStyle(.secondary)
 
             Spacer()
+
+            Button {
+                NSApp.activate(ignoringOtherApps: true)
+                openWindow(id: "settings")
+            } label: {
+                Image(systemName: "gear")
+                    .font(.footnote)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help("Settings")
 
             Button("Quit") {
                 NSApplication.shared.terminate(nil)
