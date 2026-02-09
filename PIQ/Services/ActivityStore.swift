@@ -36,7 +36,8 @@ final class ActivityStore {
         }
     }
 
-    /// Load events from disk.
+    /// Load events from disk and rebuild the status snapshot so the next
+    /// processChanges only records actual changes (not duplicates).
     func loadHistory() {
         guard FileManager.default.fileExists(atPath: storageURL.path(percentEncoded: false)) else {
             events = []
@@ -51,11 +52,18 @@ final class ActivityStore {
             // Corrupted file — start fresh
             events = []
         }
+
+        // Rebuild snapshot from loaded events so processChanges won't
+        // treat every item as "new" on the next app launch.
+        for event in events {
+            let key = event.filePath.path(percentEncoded: false)
+            statusSnapshot[key] = event.newStatus
+        }
     }
 
-    /// Most recent N events.
+    /// Most recent N events, sorted newest-first.
     func recentEvents(limit: Int = 20) -> [ActivityEvent] {
-        Array(events.suffix(limit))
+        events.sorted { $0.timestamp > $1.timestamp }.prefix(limit).map { $0 }
     }
 
     /// Calculate average time for tasks to go from open to done.
@@ -95,6 +103,25 @@ final class ActivityStore {
         return durations.reduce(0, +) / Double(durations.count)
     }
 
+    /// Per-day task completion counts for the last N days, including days with 0 completions.
+    func tasksCompletedPerDay(lastDays: Int) -> [(date: Date, count: Int)] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+
+        // Build a dictionary of day -> count for .done task events
+        var countByDay: [Date: Int] = [:]
+        for event in events where event.itemType == .task && event.newStatus == .done {
+            let day = calendar.startOfDay(for: event.timestamp)
+            countByDay[day, default: 0] += 1
+        }
+
+        // Return continuous range including days with 0
+        return (0..<lastDays).compactMap { offset -> (date: Date, count: Int)? in
+            guard let day = calendar.date(byAdding: .day, value: -offset, to: today) else { return nil }
+            return (date: day, count: countByDay[day] ?? 0)
+        }.reversed()
+    }
+
     /// Calculate how many tasks were completed in the last N days.
     func tasksCompleted(inLastDays days: Int) -> Int {
         let cutoff = Date().addingTimeInterval(-Double(days) * 86400)
@@ -132,7 +159,6 @@ final class ActivityStore {
     ) -> [ActivityEvent] {
         let itemLookup = buildItemLookup(from: projects)
         var result: [ActivityEvent] = []
-        let now = Date()
 
         for (path, newStatus) in new {
             let oldStatus = old[path]
@@ -142,12 +168,13 @@ final class ActivityStore {
             guard let info = itemLookup[path] else { continue }
 
             let event = ActivityEvent(
-                timestamp: now,
+                timestamp: info.updated,
                 itemType: info.itemType,
                 itemName: info.itemName,
                 oldStatus: oldStatus,
                 newStatus: newStatus,
-                filePath: info.filePath
+                filePath: info.filePath,
+                timestampSource: info.timestampSource
             )
             result.append(event)
         }
@@ -159,6 +186,8 @@ final class ActivityStore {
         let itemType: ItemType
         let itemName: String
         let filePath: URL
+        let updated: Date
+        let timestampSource: TimestampSource
     }
 
     private func buildItemLookup(from projects: [Project]) -> [String: ItemInfo] {
@@ -167,15 +196,18 @@ final class ActivityStore {
         for project in projects {
             for prd in project.prds {
                 let key = prd.filePath.path(percentEncoded: false)
-                lookup[key] = ItemInfo(itemType: .prd, itemName: prd.name, filePath: prd.filePath)
+                let source: TimestampSource = prd.created == prd.updated ? .created : .updated
+                lookup[key] = ItemInfo(itemType: .prd, itemName: prd.name, filePath: prd.filePath, updated: prd.updated, timestampSource: source)
             }
             for epic in project.epics {
                 let key = epic.filePath.path(percentEncoded: false)
-                lookup[key] = ItemInfo(itemType: .epic, itemName: epic.name, filePath: epic.filePath)
+                let source: TimestampSource = epic.created == epic.updated ? .created : .updated
+                lookup[key] = ItemInfo(itemType: .epic, itemName: epic.name, filePath: epic.filePath, updated: epic.updated, timestampSource: source)
             }
             for task in project.tasks {
                 let key = task.filePath.path(percentEncoded: false)
-                lookup[key] = ItemInfo(itemType: .task, itemName: task.name, filePath: task.filePath)
+                let source: TimestampSource = task.created == task.updated ? .created : .updated
+                lookup[key] = ItemInfo(itemType: .task, itemName: task.name, filePath: task.filePath, updated: task.updated, timestampSource: source)
             }
         }
 

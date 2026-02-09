@@ -11,6 +11,8 @@ struct PIQApp: App {
                 .frame(width: 360, height: 500)
                 .task {
                     appState.loadSettings()
+                    appState.setupActivityStore()
+                    appState.rescanAll()
                     NotificationService.requestPermission()
                 }
         }

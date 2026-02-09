@@ -4,6 +4,7 @@ struct MenuBarView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.openWindow) private var openWindow
     @State private var dropTargetPath: String?
+    @State private var showStats = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -21,7 +22,8 @@ struct MenuBarView: View {
             }
         }
         .task {
-            appState.rescanAll()
+            // Initial rescanAll is done in PIQApp.task to ensure
+            // ActivityStore is set up before first scan.
         }
     }
 
@@ -37,6 +39,15 @@ struct MenuBarView: View {
             Text("\(appState.projects.count) projects")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
+            Button {
+                showStats.toggle()
+            } label: {
+                Image(systemName: showStats ? "list.bullet" : "chart.bar")
+                    .font(.caption)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help(showStats ? "Show projects" : "Show stats")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -46,7 +57,9 @@ struct MenuBarView: View {
 
     @ViewBuilder
     private var content: some View {
-        if appState.projects.isEmpty {
+        if showStats {
+            StatsView()
+        } else if appState.projects.isEmpty {
             emptyState
         } else {
             projectList

@@ -186,22 +186,24 @@ struct ActivityStoreTests {
 
     // MARK: - recentEvents returns limited results
 
-    @Test("recentEvents returns limited results")
+    @Test("recentEvents returns limited results sorted newest-first")
     @MainActor
     func recentEventsLimit() {
         let (dir, storageURL) = makeTempStorageURL()
         defer { try? FileManager.default.removeItem(at: dir) }
 
         let store = ActivityStore(storageURL: storageURL)
+        let baseDate = Date(timeIntervalSince1970: 1_000_000)
 
-        // Create 5 different tasks so we get 5 events in a single processChanges call
+        // Create 5 tasks with distinct updated timestamps
         var tasks: [TaskItem] = []
         for i in 1...5 {
             tasks.append(TaskItem(
                 taskID: "\(i)",
                 name: "task-\(i)",
                 status: .open,
-                filePath: URL(filePath: "/tmp/project/.claude/epics/feat/\(i).md")
+                filePath: URL(filePath: "/tmp/project/.claude/epics/feat/\(i).md"),
+                updated: baseDate.addingTimeInterval(Double(i) * 100)
             ))
         }
         store.processChanges(projects: [makeProject(tasks: tasks)])
@@ -210,11 +212,10 @@ struct ActivityStoreTests {
         let recent3 = store.recentEvents(limit: 3)
         #expect(recent3.count == 3)
 
-        // Should be the last 3 events
-        let allEvents = store.events
-        #expect(recent3[0].id == allEvents[2].id)
-        #expect(recent3[1].id == allEvents[3].id)
-        #expect(recent3[2].id == allEvents[4].id)
+        // Should be the 3 most recent events, sorted newest-first
+        #expect(recent3[0].itemName == "task-5")
+        #expect(recent3[1].itemName == "task-4")
+        #expect(recent3[2].itemName == "task-3")
     }
 
     // MARK: - averageTaskDuration

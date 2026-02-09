@@ -1,11 +1,11 @@
 ---
 name: statistic
-status: backlog
+status: done
 created: 2026-02-08T14:43:37Z
-updated: 2026-02-08T14:48:25Z
-progress: 0%
+updated: 2026-02-09T03:39:16Z
+progress: 100%
 task_count: 2
-tasks_done: 0
+tasks_done: 2
 prd: .claude/prds/statistic.md
 github: https://github.com/wuwe1/piq/issues/13
 ---

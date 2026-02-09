@@ -37,6 +37,8 @@
 		A1000028 /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000035 /* SettingsStore.swift */; };
 		A1000029 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000036 /* NotificationService.swift */; };
 		A1000030 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000037 /* SettingsView.swift */; };
+		A1000031 /* StatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000038 /* StatsView.swift */; };
+		A1000032 /* ActivityRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000039 /* ActivityRowView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -83,6 +85,8 @@
 		A2000035 /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStore.swift; sourceTree = "<group>"; };
 		A2000036 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		A2000037 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A2000038 /* StatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsView.swift; sourceTree = "<group>"; };
+		A2000039 /* ActivityRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityRowView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -138,10 +142,12 @@
 		A4000003 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				A2000039 /* ActivityRowView.swift */,
 				A2000003 /* MenuBarView.swift */,
 				A2000026 /* ProjectCardView.swift */,
 				A2000027 /* ProjectDetailView.swift */,
 				A2000037 /* SettingsView.swift */,
+				A2000038 /* StatsView.swift */,
 				A2000028 /* StatusBadge.swift */,
 				A2000029 /* ProgressBarView.swift */,
 				A2000033 /* ToastView.swift */,
@@ -330,6 +336,8 @@
 				A1000028 /* SettingsStore.swift in Sources */,
 				A1000029 /* NotificationService.swift in Sources */,
 				A1000030 /* SettingsView.swift in Sources */,
+				A1000031 /* StatsView.swift in Sources */,
+				A1000032 /* ActivityRowView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
