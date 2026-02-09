@@ -1,7 +1,7 @@
 ---
 name: statistic
 description: "统计面板：项目进度总览、时间趋势图、活动历史时间线"
-status: backlog
+status: done
 created: 2026-02-08T14:40:57Z
 ---
 
