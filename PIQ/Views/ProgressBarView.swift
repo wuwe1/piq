@@ -5,23 +5,24 @@ struct ProgressBarView: View {
     let total: Int
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        HStack(spacing: 6) {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     Capsule()
                         .fill(Color.secondary.opacity(0.2))
-                        .frame(height: 6)
+                        .frame(height: 4)
 
                     Capsule()
                         .fill(barColor)
-                        .frame(width: barWidth(in: geometry.size.width), height: 6)
+                        .frame(width: barWidth(in: geometry.size.width), height: 4)
                 }
             }
-            .frame(height: 6)
+            .frame(height: 4)
 
             Text(label)
                 .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(.secondary)
+                .fixedSize()
         }
     }
 

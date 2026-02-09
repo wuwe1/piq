@@ -87,7 +87,7 @@ struct MenuBarView: View {
 
     private var projectList: some View {
         ScrollView {
-            VStack(spacing: 8) {
+            VStack(spacing: 6) {
                 ForEach(Array(appState.projects.enumerated()), id: \.element.id) { index, project in
                     let isDragging = draggingID == project.id
                     ProjectCardView(project: project, index: index, total: appState.projects.count)

@@ -42,20 +42,25 @@ struct ProjectCardView: View {
                     .padding(.leading, 16)
             }
         }
-        .padding(10)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
         .background(Color.primary.opacity(0.04))
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .contextMenu { projectContextMenu }
     }
 
     private var cardLabel: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(project.name)
-                .font(.subheadline)
-                .fontWeight(.bold)
-                .lineLimit(1)
+        VStack(alignment: .leading, spacing: 3) {
+            HStack {
+                Text(project.name)
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .lineLimit(1)
+                Spacer()
+                actionBar
+            }
 
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 statLabel(count: project.prds.count, label: "PRDs", icon: "doc.text")
                 statLabel(count: project.epics.count, label: "Epics", icon: "list.bullet.rectangle")
                 statLabel(count: totalTaskCount, label: "Tasks", icon: "checklist")
@@ -64,8 +69,6 @@ struct ProjectCardView: View {
             if totalTaskCount > 0 {
                 ProgressBarView(value: overallPercent, total: totalTaskCount)
             }
-
-            actionBar
         }
     }
 
