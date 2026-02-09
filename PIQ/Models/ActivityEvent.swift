@@ -14,6 +14,7 @@ struct ActivityEvent: Identifiable, Codable, Sendable {
     let newStatus: ItemStatus
     let filePath: URL
     let timestampSource: TimestampSource
+    let projectName: String
 
     init(
         id: UUID = UUID(),
@@ -23,7 +24,8 @@ struct ActivityEvent: Identifiable, Codable, Sendable {
         oldStatus: ItemStatus? = nil,
         newStatus: ItemStatus,
         filePath: URL,
-        timestampSource: TimestampSource = .updated
+        timestampSource: TimestampSource = .updated,
+        projectName: String = ""
     ) {
         self.id = id
         self.timestamp = timestamp
@@ -33,11 +35,11 @@ struct ActivityEvent: Identifiable, Codable, Sendable {
         self.newStatus = newStatus
         self.filePath = filePath
         self.timestampSource = timestampSource
+        self.projectName = projectName
     }
 
-    // Backward-compatible decoding: old events without timestampSource default to .updated
     enum CodingKeys: String, CodingKey {
-        case id, timestamp, itemType, itemName, oldStatus, newStatus, filePath, timestampSource
+        case id, timestamp, itemType, itemName, oldStatus, newStatus, filePath, timestampSource, projectName
     }
 
     init(from decoder: Decoder) throws {
@@ -50,5 +52,6 @@ struct ActivityEvent: Identifiable, Codable, Sendable {
         newStatus = try c.decode(ItemStatus.self, forKey: .newStatus)
         filePath = try c.decode(URL.self, forKey: .filePath)
         timestampSource = try c.decodeIfPresent(TimestampSource.self, forKey: .timestampSource) ?? .updated
+        projectName = try c.decodeIfPresent(String.self, forKey: .projectName) ?? ""
     }
 }

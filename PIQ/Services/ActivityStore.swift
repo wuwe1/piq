@@ -174,7 +174,8 @@ final class ActivityStore {
                 oldStatus: oldStatus,
                 newStatus: newStatus,
                 filePath: info.filePath,
-                timestampSource: info.timestampSource
+                timestampSource: info.timestampSource,
+                projectName: info.projectName
             )
             result.append(event)
         }
@@ -188,26 +189,28 @@ final class ActivityStore {
         let filePath: URL
         let updated: Date
         let timestampSource: TimestampSource
+        let projectName: String
     }
 
     private func buildItemLookup(from projects: [Project]) -> [String: ItemInfo] {
         var lookup: [String: ItemInfo] = [:]
 
         for project in projects {
+            let name = project.name
             for prd in project.prds {
                 let key = prd.filePath.path(percentEncoded: false)
                 let source: TimestampSource = prd.created == prd.updated ? .created : .updated
-                lookup[key] = ItemInfo(itemType: .prd, itemName: prd.name, filePath: prd.filePath, updated: prd.updated, timestampSource: source)
+                lookup[key] = ItemInfo(itemType: .prd, itemName: prd.name, filePath: prd.filePath, updated: prd.updated, timestampSource: source, projectName: name)
             }
             for epic in project.epics {
                 let key = epic.filePath.path(percentEncoded: false)
                 let source: TimestampSource = epic.created == epic.updated ? .created : .updated
-                lookup[key] = ItemInfo(itemType: .epic, itemName: epic.name, filePath: epic.filePath, updated: epic.updated, timestampSource: source)
+                lookup[key] = ItemInfo(itemType: .epic, itemName: epic.name, filePath: epic.filePath, updated: epic.updated, timestampSource: source, projectName: name)
             }
             for task in project.tasks {
                 let key = task.filePath.path(percentEncoded: false)
                 let source: TimestampSource = task.created == task.updated ? .created : .updated
-                lookup[key] = ItemInfo(itemType: .task, itemName: task.name, filePath: task.filePath, updated: task.updated, timestampSource: source)
+                lookup[key] = ItemInfo(itemType: .task, itemName: task.name, filePath: task.filePath, updated: task.updated, timestampSource: source, projectName: name)
             }
         }
 

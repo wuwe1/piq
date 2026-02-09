@@ -11,10 +11,17 @@ struct ActivityRowView: View {
                 .frame(width: 16)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(event.itemName)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    if !event.projectName.isEmpty {
+                        Text(event.projectName)
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundStyle(.tertiary)
+                    }
+                    Text(event.itemName)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .lineLimit(1)
+                }
 
                 HStack(spacing: 4) {
                     if let old = event.oldStatus {
