@@ -29,9 +29,15 @@ struct ActivityRowView: View {
 
             Spacer()
 
-            Text(relativeTime)
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+            HStack(spacing: 3) {
+                Text(event.timestampSource == .created ? "+" : "~")
+                    .font(.system(.caption2, design: .monospaced))
+                    .fontWeight(.bold)
+                    .foregroundStyle(event.timestampSource == .created ? .green : .orange)
+                Text(formattedTime)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
         }
         .padding(.vertical, 2)
     }
@@ -49,9 +55,23 @@ struct ActivityRowView: View {
         }
     }
 
-    private var relativeTime: String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: event.timestamp, relativeTo: Date())
+    private var formattedTime: String {
+        let now = Date()
+        let interval = now.timeIntervalSince(event.timestamp)
+
+        if interval < 60 {
+            return "just now"
+        } else if interval < 3600 {
+            let mins = Int(interval / 60)
+            return "\(mins)m ago"
+        } else if interval < 86400 {
+            let hours = Int(interval / 3600)
+            let mins = Int((interval.truncatingRemainder(dividingBy: 3600)) / 60)
+            return mins > 0 ? "\(hours)h \(mins)m ago" : "\(hours)h ago"
+        } else {
+            let days = Int(interval / 86400)
+            let hours = Int((interval.truncatingRemainder(dividingBy: 86400)) / 3600)
+            return hours > 0 ? "\(days)d \(hours)h ago" : "\(days)d ago"
+        }
     }
 }
