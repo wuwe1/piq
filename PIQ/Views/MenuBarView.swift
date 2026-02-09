@@ -3,8 +3,10 @@ import SwiftUI
 struct MenuBarView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.openWindow) private var openWindow
-    @State private var dropTargetPath: String?
     @State private var showStats = false
+    @State private var draggingID: UUID?
+    @State private var dragOffset: CGFloat = 0
+    @State private var cardHeights: [UUID: CGFloat] = [:]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -85,44 +87,85 @@ struct MenuBarView: View {
 
     private var projectList: some View {
         ScrollView {
-            LazyVStack(spacing: 8) {
-                ForEach(appState.projects) { project in
-                    let path = project.rootPath.path(percentEncoded: false)
-                    ProjectCardView(project: project)
-                        .overlay(alignment: .top) {
-                            if dropTargetPath == path {
-                                RoundedRectangle(cornerRadius: 1)
-                                    .fill(Color.accentColor)
-                                    .frame(height: 2)
-                                    .offset(y: -5)
+            VStack(spacing: 8) {
+                ForEach(Array(appState.projects.enumerated()), id: \.element.id) { index, project in
+                    let isDragging = draggingID == project.id
+                    ProjectCardView(project: project, index: index, total: appState.projects.count)
+                        .background(GeometryReader { geo in
+                            Color.clear.onAppear {
+                                cardHeights[project.id] = geo.size.height + 8
                             }
-                        }
-                        .draggable(path) {
-                            Text(project.name)
-                                .font(.subheadline.bold())
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(.regularMaterial)
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
-                        }
-                        .dropDestination(for: String.self) { items, _ in
-                            dropTargetPath = nil
-                            guard let draggedPath = items.first, draggedPath != path else { return false }
-                            appState.moveProject(from: draggedPath, to: path)
-                            return true
-                        } isTargeted: { targeted in
-                            if targeted {
-                                dropTargetPath = path
-                            } else if dropTargetPath == path {
-                                dropTargetPath = nil
-                            }
-                        }
+                        })
+                        .offset(y: isDragging ? dragOffset : shiftOffset(for: index))
+                        .zIndex(isDragging ? 1 : 0)
+                        .opacity(isDragging ? 0.85 : 1)
+                        .gesture(
+                            DragGesture()
+                                .onChanged { value in
+                                    if draggingID == nil {
+                                        draggingID = project.id
+                                    }
+                                    guard draggingID == project.id else { return }
+                                    dragOffset = value.translation.height
+                                }
+                                .onEnded { _ in
+                                    guard draggingID == project.id else { return }
+                                    let newIndex = targetIndex(from: index)
+                                    withAnimation(.easeInOut(duration: 0.15)) {
+                                        draggingID = nil
+                                        dragOffset = 0
+                                    }
+                                    if newIndex != index {
+                                        appState.moveProjectByIndex(from: index, to: newIndex)
+                                    }
+                                }
+                        )
                 }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .animation(.easeInOut(duration: 0.15), value: dropTargetPath)
         }
+    }
+
+    /// Calculate how far to shift a non-dragged card to make room.
+    private func shiftOffset(for index: Int) -> CGFloat {
+        guard let dragID = draggingID,
+              let dragIndex = appState.projects.firstIndex(where: { $0.id == dragID }),
+              index != dragIndex else { return 0 }
+
+        let h = cardHeights[dragID] ?? 70
+        let steps = stepsFromDrag(dragIndex: dragIndex)
+
+        if dragOffset > 0 {
+            // Dragging down: shift items between dragIndex+1..dragIndex+steps up
+            if index > dragIndex && index <= dragIndex + steps {
+                return -h
+            }
+        } else {
+            // Dragging up: shift items between dragIndex+steps..dragIndex-1 down
+            if index < dragIndex && index >= dragIndex + steps {
+                return h
+            }
+        }
+        return 0
+    }
+
+    /// How many positions the dragged card has moved past.
+    private func stepsFromDrag(dragIndex: Int) -> Int {
+        let avgH = cardHeights.values.isEmpty ? 70.0 : cardHeights.values.reduce(0, +) / Double(cardHeights.values.count)
+        let threshold = avgH * 0.5
+        if dragOffset > threshold {
+            return min(Int((dragOffset + threshold) / avgH), appState.projects.count - 1 - dragIndex)
+        } else if dragOffset < -threshold {
+            return max(Int((dragOffset - threshold) / avgH), -dragIndex)
+        }
+        return 0
+    }
+
+    /// Calculate the target index after drag ends.
+    private func targetIndex(from currentIndex: Int) -> Int {
+        let steps = stepsFromDrag(dragIndex: currentIndex)
+        return currentIndex + steps
     }
 
     // MARK: - Footer

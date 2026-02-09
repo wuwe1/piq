@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ProjectCardView: View {
     let project: Project
+    let index: Int
+    let total: Int
     @Environment(AppState.self) private var appState
 
     private var isExpanded: Binding<Bool> {
@@ -120,6 +122,17 @@ struct ProjectCardView: View {
             let summary = ActionService.projectStatusSummary(project)
             ActionService.copyToClipboard(summary)
             appState.showToast("Copied status")
+        }
+        Divider()
+        if index > 0 {
+            Button("Move Up") {
+                appState.moveProjectByIndex(from: index, to: index - 1)
+            }
+        }
+        if index < total - 1 {
+            Button("Move Down") {
+                appState.moveProjectByIndex(from: index, to: index + 1)
+            }
         }
     }
 
