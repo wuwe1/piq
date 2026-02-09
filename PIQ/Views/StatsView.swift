@@ -207,7 +207,7 @@ struct StatsView: View {
                 if recent.isEmpty {
                     activityEmptyState
                 } else {
-                    ForEach(recent.reversed()) { event in
+                    ForEach(recent) { event in
                         ActivityRowView(event: event)
                     }
                 }

@@ -53,9 +53,9 @@ final class ActivityStore {
         }
     }
 
-    /// Most recent N events.
+    /// Most recent N events, sorted newest-first.
     func recentEvents(limit: Int = 20) -> [ActivityEvent] {
-        Array(events.suffix(limit))
+        events.sorted { $0.timestamp > $1.timestamp }.prefix(limit).map { $0 }
     }
 
     /// Calculate average time for tasks to go from open to done.
@@ -151,7 +151,6 @@ final class ActivityStore {
     ) -> [ActivityEvent] {
         let itemLookup = buildItemLookup(from: projects)
         var result: [ActivityEvent] = []
-        let now = Date()
 
         for (path, newStatus) in new {
             let oldStatus = old[path]
@@ -161,7 +160,7 @@ final class ActivityStore {
             guard let info = itemLookup[path] else { continue }
 
             let event = ActivityEvent(
-                timestamp: now,
+                timestamp: info.updated,
                 itemType: info.itemType,
                 itemName: info.itemName,
                 oldStatus: oldStatus,
@@ -178,6 +177,7 @@ final class ActivityStore {
         let itemType: ItemType
         let itemName: String
         let filePath: URL
+        let updated: Date
     }
 
     private func buildItemLookup(from projects: [Project]) -> [String: ItemInfo] {
@@ -186,15 +186,15 @@ final class ActivityStore {
         for project in projects {
             for prd in project.prds {
                 let key = prd.filePath.path(percentEncoded: false)
-                lookup[key] = ItemInfo(itemType: .prd, itemName: prd.name, filePath: prd.filePath)
+                lookup[key] = ItemInfo(itemType: .prd, itemName: prd.name, filePath: prd.filePath, updated: prd.updated)
             }
             for epic in project.epics {
                 let key = epic.filePath.path(percentEncoded: false)
-                lookup[key] = ItemInfo(itemType: .epic, itemName: epic.name, filePath: epic.filePath)
+                lookup[key] = ItemInfo(itemType: .epic, itemName: epic.name, filePath: epic.filePath, updated: epic.updated)
             }
             for task in project.tasks {
                 let key = task.filePath.path(percentEncoded: false)
-                lookup[key] = ItemInfo(itemType: .task, itemName: task.name, filePath: task.filePath)
+                lookup[key] = ItemInfo(itemType: .task, itemName: task.name, filePath: task.filePath, updated: task.updated)
             }
         }
 

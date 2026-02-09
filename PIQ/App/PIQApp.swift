@@ -12,6 +12,7 @@ struct PIQApp: App {
                 .task {
                     appState.loadSettings()
                     appState.setupActivityStore()
+                    appState.rescanAll()
                     NotificationService.requestPermission()
                 }
         }

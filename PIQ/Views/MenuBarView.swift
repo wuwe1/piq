@@ -22,7 +22,8 @@ struct MenuBarView: View {
             }
         }
         .task {
-            appState.rescanAll()
+            // Initial rescanAll is done in PIQApp.task to ensure
+            // ActivityStore is set up before first scan.
         }
     }
 
