@@ -31,7 +31,7 @@ struct MenuBarView: View {
 
     private var header: some View {
         HStack {
-            Image(systemName: "chart.bar.fill")
+            Image(systemName: "eyes")
                 .foregroundStyle(.secondary)
             Text("PIQ")
                 .font(.headline)
