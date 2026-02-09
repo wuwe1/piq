@@ -166,7 +166,7 @@ enum FrontmatterParser {
         let status = fm["status"]?.stringValue.flatMap { ItemStatus(tolerant: $0) } ?? .backlog
         let description = fm["description"]?.stringValue ?? ""
         let created = parseDate(fm["created"])
-        let updated = parseDate(fm["updated"])
+        let updated = parseDateWithFallback(fm["updated"], fallback: created)
 
         return .prd(PRDItem(
             name: name,
@@ -185,7 +185,7 @@ enum FrontmatterParser {
         let description = fm["description"]?.stringValue ?? ""
         let progress = fm["progress"]?.intValue ?? parseProgressString(fm["progress"])
         let created = parseDate(fm["created"])
-        let updated = parseDate(fm["updated"])
+        let updated = parseDateWithFallback(fm["updated"], fallback: created)
 
         let github = fm["github"]?.stringValue.flatMap { str in
             str.isEmpty ? nil : URL(string: str)
@@ -209,7 +209,7 @@ enum FrontmatterParser {
         let status = fm["status"]?.stringValue.flatMap { ItemStatus(tolerant: $0) } ?? .open
         let description = fm["description"]?.stringValue ?? ""
         let created = parseDate(fm["created"])
-        let updated = parseDate(fm["updated"])
+        let updated = parseDateWithFallback(fm["updated"], fallback: created)
         let taskID = filePath.deletingPathExtension().lastPathComponent
 
         let github = fm["github"]?.stringValue.flatMap { str in
@@ -232,6 +232,16 @@ enum FrontmatterParser {
 
     private static func parseDate(_ value: FrontmatterValue?) -> Date {
         guard let raw = value?.stringValue else { return Date() }
+        return parseDateString(raw) ?? Date()
+    }
+
+    /// Parse a date value, falling back to `fallback` when the value is nil or unparseable.
+    private static func parseDateWithFallback(_ value: FrontmatterValue?, fallback: Date) -> Date {
+        guard let raw = value?.stringValue else { return fallback }
+        return parseDateString(raw) ?? fallback
+    }
+
+    private static func parseDateString(_ raw: String) -> Date? {
         if let date = try? Date(raw, strategy: .iso8601) {
             return date
         }
@@ -240,7 +250,7 @@ enum FrontmatterParser {
         formatter.dateFormat = "yyyy-MM-dd"
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone(identifier: "UTC")
-        return formatter.date(from: raw) ?? Date()
+        return formatter.date(from: raw)
     }
 
     /// Parse progress from string like "75%" or "75".
