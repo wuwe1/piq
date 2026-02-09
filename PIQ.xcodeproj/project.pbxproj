@@ -39,6 +39,8 @@
 		A1000030 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000037 /* SettingsView.swift */; };
 		A1000031 /* StatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000038 /* StatsView.swift */; };
 		A1000032 /* ActivityRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000039 /* ActivityRowView.swift */; };
+		A1000033 /* ScreenshotGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000040 /* ScreenshotGenerator.swift */; };
+		A1000034 /* ScreenshotGenerationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000041 /* ScreenshotGenerationTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -87,6 +89,8 @@
 		A2000037 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A2000038 /* StatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsView.swift; sourceTree = "<group>"; };
 		A2000039 /* ActivityRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityRowView.swift; sourceTree = "<group>"; };
+		A2000040 /* ScreenshotGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotGenerator.swift; sourceTree = "<group>"; };
+		A2000041 /* ScreenshotGenerationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotGenerationTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -188,6 +192,7 @@
 		A4000006 /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				A2000040 /* ScreenshotGenerator.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -207,6 +212,7 @@
 				A2000018 /* FrontmatterParserTests.swift */,
 				A2000025 /* FileWatcherTests.swift */,
 				A2000023 /* ProjectScannerTests.swift */,
+				A2000041 /* ScreenshotGenerationTests.swift */,
 			);
 			path = PIQTests;
 			sourceTree = "<group>";
@@ -338,6 +344,7 @@
 				A1000030 /* SettingsView.swift in Sources */,
 				A1000031 /* StatsView.swift in Sources */,
 				A1000032 /* ActivityRowView.swift in Sources */,
+				A1000033 /* ScreenshotGenerator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -349,6 +356,7 @@
 				A1000016 /* ProjectScannerTests.swift in Sources */,
 				A1000018 /* FileWatcherTests.swift in Sources */,
 				A1000024 /* ActivityStoreTests.swift in Sources */,
+				A1000034 /* ScreenshotGenerationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
