@@ -36,7 +36,8 @@ final class ActivityStore {
         }
     }
 
-    /// Load events from disk.
+    /// Load events from disk and rebuild the status snapshot so the next
+    /// processChanges only records actual changes (not duplicates).
     func loadHistory() {
         guard FileManager.default.fileExists(atPath: storageURL.path(percentEncoded: false)) else {
             events = []
@@ -50,6 +51,13 @@ final class ActivityStore {
         } catch {
             // Corrupted file — start fresh
             events = []
+        }
+
+        // Rebuild snapshot from loaded events so processChanges won't
+        // treat every item as "new" on the next app launch.
+        for event in events {
+            let key = event.filePath.path(percentEncoded: false)
+            statusSnapshot[key] = event.newStatus
         }
     }
 
