@@ -18,22 +18,11 @@ Built for developers using [Claude Code](https://docs.anthropic.com/en/docs/clau
 
 ## Screenshots
 
-```
-┌─────────────────────────────────────┐
-│  👀 PIQ                  2 projects │
-├─────────────────────────────────────┤
-│  📂 my-project                      │
-│  PRDs  1 done        Tasks  6/8     │
-│  Epics 1 in-progress                │
-│  ████████████░░░░ 75%               │
-│                                     │
-│  📂 another-project                 │
-│  PRDs  1 backlog     Tasks  —       │
-│  Epics 0                            │
-├─────────────────────────────────────┤
-│  ↻ Refresh              ⚙ Settings │
-└─────────────────────────────────────┘
-```
+<p align="center">
+  <img src="assets/screenshot-menubar.png" width="280" alt="Menu bar overview">
+  <img src="assets/screenshot-detail.png" width="280" alt="Expanded project detail">
+  <img src="assets/screenshot-stats.png" width="280" alt="Statistics dashboard">
+</p>
 
 ## Install
 
