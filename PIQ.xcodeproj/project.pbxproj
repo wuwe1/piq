@@ -41,6 +41,20 @@
 		A1000032 /* ActivityRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000039 /* ActivityRowView.swift */; };
 		A1000033 /* ScreenshotGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000040 /* ScreenshotGenerator.swift */; };
 		A1000034 /* ScreenshotGenerationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000041 /* ScreenshotGenerationTests.swift */; };
+		A1000050 /* SessionEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000050 /* SessionEntry.swift */; };
+		A1000051 /* SessionMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000051 /* SessionMessage.swift */; };
+		A1000052 /* SessionTurn.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000052 /* SessionTurn.swift */; };
+		A1000053 /* SessionParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000053 /* SessionParser.swift */; };
+		A1000054 /* SessionScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000054 /* SessionScanner.swift */; };
+		A1000055 /* SessionFileWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000055 /* SessionFileWatcher.swift */; };
+		A1000056 /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000056 /* SessionStore.swift */; };
+		A1000057 /* SessionWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000057 /* SessionWindowView.swift */; };
+		A1000058 /* SessionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000058 /* SessionListView.swift */; };
+		A1000059 /* SessionRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000059 /* SessionRowView.swift */; };
+		A1000060 /* SessionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000060 /* SessionDetailView.swift */; };
+		A1000061 /* SessionTurnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000061 /* SessionTurnView.swift */; };
+		A1000062 /* SessionContentBlockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000062 /* SessionContentBlockView.swift */; };
+		A1000063 /* SessionToolCallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000063 /* SessionToolCallView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -91,6 +105,20 @@
 		A2000039 /* ActivityRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityRowView.swift; sourceTree = "<group>"; };
 		A2000040 /* ScreenshotGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotGenerator.swift; sourceTree = "<group>"; };
 		A2000041 /* ScreenshotGenerationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotGenerationTests.swift; sourceTree = "<group>"; };
+		A2000050 /* SessionEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionEntry.swift; sourceTree = "<group>"; };
+		A2000051 /* SessionMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionMessage.swift; sourceTree = "<group>"; };
+		A2000052 /* SessionTurn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTurn.swift; sourceTree = "<group>"; };
+		A2000053 /* SessionParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionParser.swift; sourceTree = "<group>"; };
+		A2000054 /* SessionScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionScanner.swift; sourceTree = "<group>"; };
+		A2000055 /* SessionFileWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionFileWatcher.swift; sourceTree = "<group>"; };
+		A2000056 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
+		A2000057 /* SessionWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionWindowView.swift; sourceTree = "<group>"; };
+		A2000058 /* SessionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListView.swift; sourceTree = "<group>"; };
+		A2000059 /* SessionRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRowView.swift; sourceTree = "<group>"; };
+		A2000060 /* SessionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDetailView.swift; sourceTree = "<group>"; };
+		A2000061 /* SessionTurnView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTurnView.swift; sourceTree = "<group>"; };
+		A2000062 /* SessionContentBlockView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionContentBlockView.swift; sourceTree = "<group>"; };
+		A2000063 /* SessionToolCallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionToolCallView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -155,6 +183,13 @@
 				A2000028 /* StatusBadge.swift */,
 				A2000029 /* ProgressBarView.swift */,
 				A2000033 /* ToastView.swift */,
+				A2000057 /* SessionWindowView.swift */,
+				A2000058 /* SessionListView.swift */,
+				A2000059 /* SessionRowView.swift */,
+				A2000060 /* SessionDetailView.swift */,
+				A2000061 /* SessionTurnView.swift */,
+				A2000062 /* SessionContentBlockView.swift */,
+				A2000063 /* SessionToolCallView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -170,6 +205,9 @@
 				A2000016 /* ActivityEvent.swift */,
 				A2000020 /* ProjectConfig.swift */,
 				A2000034 /* Settings.swift */,
+				A2000050 /* SessionEntry.swift */,
+				A2000051 /* SessionMessage.swift */,
+				A2000052 /* SessionTurn.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -185,6 +223,10 @@
 				A2000021 /* ProjectScanner.swift */,
 				A2000022 /* ProjectStore.swift */,
 				A2000035 /* SettingsStore.swift */,
+				A2000053 /* SessionParser.swift */,
+				A2000054 /* SessionScanner.swift */,
+				A2000055 /* SessionFileWatcher.swift */,
+				A2000056 /* SessionStore.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -345,6 +387,20 @@
 				A1000031 /* StatsView.swift in Sources */,
 				A1000032 /* ActivityRowView.swift in Sources */,
 				A1000033 /* ScreenshotGenerator.swift in Sources */,
+				A1000050 /* SessionEntry.swift in Sources */,
+				A1000051 /* SessionMessage.swift in Sources */,
+				A1000052 /* SessionTurn.swift in Sources */,
+				A1000053 /* SessionParser.swift in Sources */,
+				A1000054 /* SessionScanner.swift in Sources */,
+				A1000055 /* SessionFileWatcher.swift in Sources */,
+				A1000056 /* SessionStore.swift in Sources */,
+				A1000057 /* SessionWindowView.swift in Sources */,
+				A1000058 /* SessionListView.swift in Sources */,
+				A1000059 /* SessionRowView.swift in Sources */,
+				A1000060 /* SessionDetailView.swift in Sources */,
+				A1000061 /* SessionTurnView.swift in Sources */,
+				A1000062 /* SessionContentBlockView.swift in Sources */,
+				A1000063 /* SessionToolCallView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -185,6 +185,17 @@ struct MenuBarView: View {
 
             Button {
                 NSApp.activate(ignoringOtherApps: true)
+                openWindow(id: "sessions")
+            } label: {
+                Image(systemName: "bubble.left.and.bubble.right")
+                    .font(.footnote)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help("Sessions")
+
+            Button {
+                NSApp.activate(ignoringOtherApps: true)
                 openWindow(id: "settings")
             } label: {
                 Image(systemName: "gear")

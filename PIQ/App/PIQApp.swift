@@ -13,6 +13,7 @@ struct PIQApp: App {
                     appState.loadSettings()
                     appState.setupActivityStore()
                     appState.rescanAll()
+                    appState.setupSessionStore()
                     NotificationService.requestPermission()
                 }
         }
@@ -24,5 +25,11 @@ struct PIQApp: App {
         }
         .defaultSize(width: 480, height: 360)
         .windowResizability(.contentSize)
+
+        Window("Claude Sessions", id: "sessions") {
+            SessionWindowView()
+                .environment(appState)
+        }
+        .defaultSize(width: 900, height: 640)
     }
 }

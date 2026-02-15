@@ -11,6 +11,7 @@ final class AppState {
     var expandedProjectPaths: Set<String> = []
     var toastMessage: String?
     var activityStore: ActivityStore?
+    var sessionStore: SessionStore?
     private var fileWatcher: FileWatcher?
 
     /// Snapshot of epic progress percentages from the previous scan, keyed by file path.
@@ -120,6 +121,13 @@ final class AppState {
         let store = ActivityStore(storageURL: activityFileURL)
         store.loadHistory()
         activityStore = store
+    }
+
+    func setupSessionStore() {
+        let store = SessionStore()
+        store.rescan()
+        store.startWatching()
+        sessionStore = store
     }
 
     func showToast(_ message: String) {
