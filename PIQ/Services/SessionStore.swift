@@ -2,6 +2,23 @@ import Foundation
 
 // MARK: - ClaudeStats
 
+struct DailyActivity: Identifiable, Sendable {
+    var id: String { date }
+    let date: String           // "2026-02-14"
+    let messageCount: Int
+}
+
+struct ModelStats: Identifiable, Sendable {
+    var id: String { model }
+    let model: String          // "claude-opus-4-6"
+    let displayName: String    // "Opus 4.6"
+    let inputTokens: Int
+    let outputTokens: Int
+    let cacheReadTokens: Int
+    let cacheCreationTokens: Int
+    var totalTokens: Int { inputTokens + outputTokens }
+}
+
 struct ClaudeStats: Sendable {
     let totalSessions: Int
     let totalMessages: Int
@@ -9,6 +26,13 @@ struct ClaudeStats: Sendable {
     let totalOutputTokens: Int
     let totalCacheReadTokens: Int
     let totalCacheCreationTokens: Int
+
+    let firstSessionDate: Date?
+    let longestSessionMessages: Int
+    let longestSessionDuration: TimeInterval
+    let hourCounts: [Int: Int]
+    let dailyActivity: [DailyActivity]
+    let modelBreakdown: [ModelStats]
 
     /// Actual API tokens (excluding cache)
     var totalTokens: Int { totalInputTokens + totalOutputTokens }
@@ -174,14 +198,66 @@ final class SessionStore {
         var totalOutput = 0
         var totalCacheRead = 0
         var totalCacheCreation = 0
+        var modelBreakdown: [ModelStats] = []
         if let modelUsage = json["modelUsage"] as? [String: [String: Any]] {
-            for (_, usage) in modelUsage {
-                totalInput += usage["inputTokens"] as? Int ?? 0
-                totalOutput += usage["outputTokens"] as? Int ?? 0
-                totalCacheRead += usage["cacheReadInputTokens"] as? Int ?? 0
-                totalCacheCreation += usage["cacheCreationInputTokens"] as? Int ?? 0
+            for (model, usage) in modelUsage {
+                let inp = usage["inputTokens"] as? Int ?? 0
+                let out = usage["outputTokens"] as? Int ?? 0
+                let cacheRead = usage["cacheReadInputTokens"] as? Int ?? 0
+                let cacheCreate = usage["cacheCreationInputTokens"] as? Int ?? 0
+                totalInput += inp
+                totalOutput += out
+                totalCacheRead += cacheRead
+                totalCacheCreation += cacheCreate
+                modelBreakdown.append(ModelStats(
+                    model: model,
+                    displayName: Self.modelDisplayName(model),
+                    inputTokens: inp,
+                    outputTokens: out,
+                    cacheReadTokens: cacheRead,
+                    cacheCreationTokens: cacheCreate
+                ))
             }
         }
+        modelBreakdown.sort { $0.totalTokens > $1.totalTokens }
+
+        // firstSessionDate
+        var firstDate: Date?
+        if let dateStr = json["firstSessionDate"] as? String {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            firstDate = formatter.date(from: dateStr)
+        }
+
+        // longestSession
+        var longestMsgs = 0
+        var longestDuration: TimeInterval = 0
+        if let longest = json["longestSession"] as? [String: Any] {
+            longestMsgs = longest["messageCount"] as? Int ?? 0
+            longestDuration = longest["duration"] as? Double ?? 0
+        }
+
+        // hourCounts
+        var hourCounts: [Int: Int] = [:]
+        if let hours = json["hourCounts"] as? [String: Int] {
+            for (key, value) in hours {
+                if let hour = Int(key) {
+                    hourCounts[hour] = value
+                }
+            }
+        }
+
+        // dailyActivity
+        var dailyActivity: [DailyActivity] = []
+        if let daily = json["dailyActivity"] as? [[String: Any]] {
+            for entry in daily {
+                if let date = entry["date"] as? String,
+                   let count = entry["messageCount"] as? Int {
+                    dailyActivity.append(DailyActivity(date: date, messageCount: count))
+                }
+            }
+        }
+        dailyActivity.sort { $0.date < $1.date }
 
         return ClaudeStats(
             totalSessions: totalSessions,
@@ -189,8 +265,26 @@ final class SessionStore {
             totalInputTokens: totalInput,
             totalOutputTokens: totalOutput,
             totalCacheReadTokens: totalCacheRead,
-            totalCacheCreationTokens: totalCacheCreation
+            totalCacheCreationTokens: totalCacheCreation,
+            firstSessionDate: firstDate,
+            longestSessionMessages: longestMsgs,
+            longestSessionDuration: longestDuration,
+            hourCounts: hourCounts,
+            dailyActivity: dailyActivity,
+            modelBreakdown: modelBreakdown
         )
+    }
+
+    /// Convert model ID to a short display name.
+    private nonisolated static func modelDisplayName(_ model: String) -> String {
+        if model.contains("opus-4-6") { return "Opus 4.6" }
+        if model.contains("opus-4-5") { return "Opus 4.5" }
+        if model.contains("sonnet-4-5") { return "Sonnet 4.5" }
+        if model.contains("haiku-4-5") { return "Haiku 4.5" }
+        if model.contains("opus") { return "Opus" }
+        if model.contains("sonnet") { return "Sonnet" }
+        if model.contains("haiku") { return "Haiku" }
+        return model
     }
 
     // MARK: - File Watching

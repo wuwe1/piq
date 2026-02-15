@@ -1,12 +1,19 @@
 import SwiftUI
 
+/// Sidebar selection: either the stats overview or a specific session.
+enum SidebarSelection: Hashable {
+    case overview
+    case session(String)
+}
+
 /// Root view for the Claude Sessions window.
 /// Uses NavigationSplitView with sidebar list and detail pane.
 struct SessionWindowView: View {
     @Environment(AppState.self) private var appState
-    @State private var selectedSessionId: String?
+    @State private var selection: SidebarSelection? = .overview
     @State private var searchText = ""
     @State private var projectFilter: String?
+    @State private var stats: ClaudeStats?
 
     private var sessionStore: SessionStore? { appState.sessionStore }
 
@@ -56,7 +63,7 @@ struct SessionWindowView: View {
             }
             // Pick up pending selection from menubar click
             if let pending = appState.pendingSessionId {
-                selectedSessionId = pending
+                selection = .session(pending)
                 appState.pendingSessionId = nil
                 if let entry = filteredSessions.first(where: { $0.id == pending }) {
                     Task {
@@ -65,9 +72,14 @@ struct SessionWindowView: View {
                 }
             }
         }
+        .task {
+            stats = await Task.detached { [sessionStore] in
+                sessionStore?.loadStats()
+            }.value
+        }
         .onChange(of: appState.pendingSessionId) { _, newValue in
             guard let pending = newValue else { return }
-            selectedSessionId = pending
+            selection = .session(pending)
             appState.pendingSessionId = nil
             if let entry = filteredSessions.first(where: { $0.id == pending }) {
                 Task {
@@ -155,24 +167,37 @@ struct SessionWindowView: View {
             Divider()
 
             // Session list
-            if filteredSessions.isEmpty {
+            if filteredSessions.isEmpty && searchText.isEmpty {
                 ContentUnavailableView {
                     Label("No Sessions", systemImage: "bubble.left.and.bubble.right")
                 } description: {
-                    if searchText.isEmpty {
-                        Text("Claude Code sessions will appear here")
-                    } else {
-                        Text("No sessions match your search")
-                    }
+                    Text("Claude Code sessions will appear here")
                 }
             } else {
-                List(filteredSessions, selection: $selectedSessionId) { session in
-                    SessionRowView(entry: session)
-                        .tag(session.id)
+                List(selection: $selection) {
+                    Label("Overview", systemImage: "chart.bar.xaxis")
+                        .tag(SidebarSelection.overview)
+
+                    Section {
+                        if filteredSessions.isEmpty {
+                            Text("No sessions match your search")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.vertical, 8)
+                        } else {
+                            ForEach(filteredSessions) { session in
+                                SessionRowView(entry: session)
+                                    .tag(SidebarSelection.session(session.id))
+                            }
+                        }
+                    } header: {
+                        Text("Sessions")
+                    }
                 }
                 .listStyle(.sidebar)
-                .onChange(of: selectedSessionId) { _, newValue in
-                    if let id = newValue,
+                .onChange(of: selection) { _, newValue in
+                    if case .session(let id) = newValue,
                        let entry = filteredSessions.first(where: { $0.id == id }) {
                         Task {
                             await sessionStore?.loadSessionDetail(entry: entry)
@@ -182,22 +207,69 @@ struct SessionWindowView: View {
                     }
                 }
             }
+
+            if let stats {
+                Divider()
+                sidebarFooter(stats: stats)
+            }
         }
+    }
+
+    // MARK: - Sidebar Footer
+
+    private func sidebarFooter(stats: ClaudeStats) -> some View {
+        HStack(spacing: 8) {
+            Text("\(formatCount(stats.totalMessages)) msgs")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text("·")
+                .foregroundStyle(.quaternary)
+            Text("\(formatCount(stats.totalInputTokens)) in")
+                .font(.caption2)
+                .foregroundStyle(.blue.opacity(0.8))
+            Text("\(formatCount(stats.totalOutputTokens)) out")
+                .font(.caption2)
+                .foregroundStyle(.green.opacity(0.8))
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+
+    private func formatCount(_ count: Int) -> String {
+        if count >= 1_000_000_000 {
+            return String(format: "%.1fB", Double(count) / 1_000_000_000)
+        } else if count >= 1_000_000 {
+            return String(format: "%.1fM", Double(count) / 1_000_000)
+        } else if count >= 1_000 {
+            return String(format: "%.1fK", Double(count) / 1_000)
+        }
+        return "\(count)"
     }
 
     // MARK: - Detail
 
     @ViewBuilder
     private var detail: some View {
-        if let store = sessionStore,
-           let sessionId = selectedSessionId,
-           let entry = filteredSessions.first(where: { $0.id == sessionId }) {
-            SessionDetailView(entry: entry, store: store)
-        } else {
-            ContentUnavailableView {
-                Label("Select a Session", systemImage: "bubble.left.and.bubble.right")
-            } description: {
-                Text("Choose a session from the sidebar to view its conversation")
+        switch selection {
+        case .session(let id):
+            if let store = sessionStore,
+               let entry = filteredSessions.first(where: { $0.id == id }) {
+                SessionDetailView(entry: entry, store: store)
+            }
+        case .overview:
+            if let stats, let store = sessionStore {
+                StatsOverviewView(stats: stats, sessions: store.sessions)
+            }
+        case nil:
+            if let stats, let store = sessionStore {
+                StatsOverviewView(stats: stats, sessions: store.sessions)
+            } else {
+                ContentUnavailableView {
+                    Label("Select a Session", systemImage: "bubble.left.and.bubble.right")
+                } description: {
+                    Text("Choose a session from the sidebar to view its conversation")
+                }
             }
         }
     }
