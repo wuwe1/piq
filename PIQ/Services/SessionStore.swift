@@ -55,7 +55,9 @@ final class SessionStore {
                 options: [.skipsHiddenFiles]
             ) else { continue }
 
-            let jsonlFiles = contents.filter { $0.pathExtension == "jsonl" }
+            let jsonlFiles = contents.filter {
+                $0.pathExtension == "jsonl" && !$0.lastPathComponent.hasPrefix("agent-")
+            }
 
             for file in jsonlFiles {
                 let newMtime = SessionScanner.modificationDate(of: file)
@@ -105,9 +107,31 @@ final class SessionStore {
         loadedTurns = []
 
         let url = entry.jsonlURL
+        let sessionId = entry.id
         let turns = await Task.detached(priority: .userInitiated) {
             let messages = SessionParser.parseFile(at: url)
-            return SessionParser.groupIntoTurns(messages)
+            var turns = SessionParser.groupIntoTurns(messages)
+
+            // Load agent conversations and attach to Task tool calls
+            let agentMap = SessionParser.loadAgentTurns(
+                sessionDir: url.deletingLastPathComponent(),
+                sessionId: sessionId
+            )
+            if !agentMap.isEmpty {
+                for i in turns.indices {
+                    for j in turns[i].toolPairs.indices {
+                        let pair = turns[i].toolPairs[j]
+                        if pair.name == "Task",
+                           let output = pair.output,
+                           let agentId = SessionParser.extractAgentId(from: output),
+                           let agentTurns = agentMap[agentId] {
+                            turns[i].toolPairs[j].agentTurns = agentTurns
+                        }
+                    }
+                }
+            }
+
+            return turns
         }.value
 
         // Only update if we're still viewing this session

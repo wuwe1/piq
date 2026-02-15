@@ -5,6 +5,7 @@ struct SessionToolCallView: View {
     let pair: ToolCallPair
     @State private var showInput = false
     @State private var showOutput = false
+    @State private var showAgent = false
 
     private var toolInfo: (color: Color, icon: String) {
         let name = pair.name.lowercased()
@@ -39,6 +40,11 @@ struct SessionToolCallView: View {
             // Output section
             if showOutput, let output = pair.output {
                 outputSection(output)
+            }
+
+            // Agent conversation (for Task tool calls)
+            if let agentTurns = pair.agentTurns, !agentTurns.isEmpty {
+                agentSection(agentTurns)
             }
         }
         .background(toolInfo.color.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
@@ -107,6 +113,23 @@ struct SessionToolCallView: View {
                 }
                 .buttonStyle(.plain)
             }
+
+            if pair.agentTurns != nil {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        showAgent.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 2) {
+                        Image(systemName: "chevron.right")
+                            .rotationEffect(.degrees(showAgent ? 90 : 0))
+                        Text("Agent")
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.cyan)
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
@@ -143,6 +166,31 @@ struct SessionToolCallView: View {
                     .padding(10)
             }
             .frame(maxHeight: 200)
+        }
+    }
+
+    // MARK: - Agent Section
+
+    private func agentSection(_ turns: [SessionTurn]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if showAgent {
+                Divider().padding(.horizontal, 10)
+
+                HStack(spacing: 0) {
+                    // Left accent border
+                    Rectangle()
+                        .fill(.cyan.opacity(0.3))
+                        .frame(width: 2)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(turns) { turn in
+                            SessionTurnView(turn: turn)
+                        }
+                    }
+                    .padding(10)
+                }
+                .background(.cyan.opacity(0.03))
+            }
         }
     }
 

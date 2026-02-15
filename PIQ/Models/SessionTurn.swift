@@ -8,7 +8,7 @@ struct SessionTurn: Identifiable, Sendable {
     let id: String
     let userMessage: SessionMessage?
     let assistantMessages: [SessionMessage]
-    let toolPairs: [ToolCallPair]
+    var toolPairs: [ToolCallPair]
     let durationMs: Double?
     let totalUsage: TokenUsage?
 }
@@ -23,4 +23,5 @@ struct ToolCallPair: Identifiable, Sendable {
     let inputJSON: String   // pretty-printed JSON of tool input
     let output: String?     // tool result content
     let isError: Bool
+    var agentTurns: [SessionTurn]? // Agent conversation for Task tool calls
 }

@@ -35,7 +35,9 @@ enum SessionScanner {
             options: [.skipsHiddenFiles]
         ) else { return [] }
 
-        let jsonlFiles = contents.filter { $0.pathExtension == "jsonl" }
+        let jsonlFiles = contents.filter {
+            $0.pathExtension == "jsonl" && !$0.lastPathComponent.hasPrefix("agent-")
+        }
 
         return jsonlFiles.compactMap { url in
             SessionParser.extractMetadata(from: url)
@@ -43,24 +45,69 @@ enum SessionScanner {
     }
 
     /// Scan all projects and return sessions sorted by last activity (newest first).
-    /// Deduplicates by sessionId, keeping the entry with the latest activity.
+    /// Deduplicates by resolving session continuation chains.
+    ///
+    /// Claude Code creates continuation files when resuming a session:
+    /// the new file's sessionId references the previous file's UUID, forming a chain.
+    /// We resolve the full chain and keep one entry per logical session.
     static func scanAll() -> [SessionEntry] {
         let projects = discoverProjects()
         let allSessions = projects.flatMap { scanSessions(in: $0) }
 
-        // Deduplicate by sessionId — keep the most recently active entry
-        var seen: [String: SessionEntry] = [:]
-        for session in allSessions {
-            if let existing = seen[session.id] {
-                if session.lastActivityAt > existing.lastActivityAt {
-                    seen[session.id] = session
-                }
-            } else {
-                seen[session.id] = session
-            }
+        // Map each file's UUID (from filename) to the sessionId found in its content.
+        // If fileUUID == sessionId, the file is the root of the session.
+        // If fileUUID != sessionId, sessionId references the parent file.
+        var fileToSessionId: [String: String] = [:]
+        for entry in allSessions {
+            let fileUUID = entry.jsonlURL.deletingPathExtension().lastPathComponent
+            fileToSessionId[fileUUID] = entry.id
         }
 
-        return seen.values.sorted { $0.lastActivityAt > $1.lastActivityAt }
+        // Follow the chain to find the root sessionId.
+        func rootId(of sessionId: String, visited: Set<String> = []) -> String {
+            guard !visited.contains(sessionId) else { return sessionId }
+            if let parentId = fileToSessionId[sessionId], parentId != sessionId {
+                return rootId(of: parentId, visited: visited.union([sessionId]))
+            }
+            return sessionId
+        }
+
+        // Group all entries by their root sessionId.
+        var groups: [String: [SessionEntry]] = [:]
+        for entry in allSessions {
+            let root = rootId(of: entry.id)
+            groups[root, default: []].append(entry)
+        }
+
+        // Pick the best representative per group:
+        // - Prefer entries with a meaningful prompt (not "[Request interrupted...")
+        // - Use the latest activity time from the group
+        return groups.values.compactMap { group -> SessionEntry? in
+            let sorted = group.sorted { $0.lastActivityAt > $1.lastActivityAt }
+            guard let latest = sorted.first else { return nil }
+            let best = sorted.first {
+                !$0.firstPrompt.hasPrefix("[Request interrupted")
+            } ?? latest
+
+            // If the best prompt entry isn't the most recent, update activity time
+            if best.id != latest.id, latest.lastActivityAt > best.lastActivityAt {
+                return SessionEntry(
+                    id: best.id,
+                    projectPath: best.projectPath,
+                    projectName: best.projectName,
+                    firstPrompt: best.firstPrompt,
+                    messageCount: group.reduce(0) { $0 + $1.messageCount },
+                    model: latest.model.isEmpty ? best.model : latest.model,
+                    gitBranch: latest.gitBranch.isEmpty ? best.gitBranch : latest.gitBranch,
+                    slug: best.slug,
+                    createdAt: best.createdAt,
+                    lastActivityAt: latest.lastActivityAt,
+                    jsonlURL: latest.jsonlURL,
+                    hasSubagents: group.contains { $0.hasSubagents }
+                )
+            }
+            return best
+        }.sorted { $0.lastActivityAt > $1.lastActivityAt }
     }
 
     /// Get modification date for a JSONL file.

@@ -79,40 +79,76 @@ struct SessionWindowView: View {
 
     // MARK: - Sidebar
 
+    private var selectedProjectName: String {
+        if let filter = projectFilter,
+           let project = uniqueProjects.first(where: { $0.path == filter }) {
+            return project.name
+        }
+        return "All"
+    }
+
     private var sidebar: some View {
         VStack(spacing: 0) {
             // Search + filter bar
-            VStack(spacing: 6) {
-                HStack(spacing: 6) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.tertiary)
-                        .font(.caption)
-                    TextField("Search sessions...", text: $searchText)
-                        .textFieldStyle(.plain)
-                        .font(.caption)
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.tertiary)
+                    .font(.caption)
+                TextField("Search sessions...", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(.caption)
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
-
-                if !uniqueProjects.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 4) {
-                            filterChip(label: "All", isSelected: projectFilter == nil) {
-                                projectFilter = nil
+                if uniqueProjects.count > 1 {
+                    Menu {
+                        Button {
+                            projectFilter = nil
+                        } label: {
+                            if projectFilter == nil {
+                                Label("All", systemImage: "checkmark")
+                            } else {
+                                Text("All")
                             }
-                            ForEach(uniqueProjects, id: \.path) { project in
-                                filterChip(
-                                    label: project.name,
-                                    isSelected: projectFilter == project.path
-                                ) {
-                                    projectFilter = project.path
+                        }
+                        Divider()
+                        ForEach(uniqueProjects, id: \.path) { project in
+                            Button {
+                                projectFilter = project.path
+                            } label: {
+                                if projectFilter == project.path {
+                                    Label(project.name, systemImage: "checkmark")
+                                } else {
+                                    Text(project.name)
                                 }
                             }
                         }
+                    } label: {
+                        HStack(spacing: 2) {
+                            Text(selectedProjectName)
+                                .lineLimit(1)
+                            Image(systemName: "chevron.up.chevron.down")
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(projectFilter != nil ? .primary : .secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(.quaternary, in: Capsule())
                     }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
                 }
             }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
 
@@ -166,21 +202,4 @@ struct SessionWindowView: View {
         }
     }
 
-    // MARK: - Filter Chip
-
-    private func filterChip(label: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(label)
-                .font(.caption2)
-                .lineLimit(1)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(
-                    isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.quaternary),
-                    in: Capsule()
-                )
-                .foregroundStyle(isSelected ? .white : .primary)
-        }
-        .buttonStyle(.plain)
-    }
 }

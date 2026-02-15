@@ -86,10 +86,13 @@ enum SessionParser {
                 model = m
             }
 
-            // Extract first user prompt (skip tool_result-only user messages)
-            if firstPrompt.isEmpty, lineType == "user",
+            // Extract first user prompt (skip tool_result-only and interruption marker messages)
+            if lineType == "user",
                let msg = json["message"] as? [String: Any] {
-                firstPrompt = extractUserText(from: msg)
+                let text = extractUserText(from: msg)
+                if firstPrompt.isEmpty && !text.hasPrefix("[Request interrupted") {
+                    firstPrompt = text
+                }
             }
 
             if let sidechain = json["isSidechain"] as? Bool, sidechain {
@@ -137,6 +140,11 @@ enum SessionParser {
 
         // Skip empty sessions with no prompt and no messages
         if firstPrompt.isEmpty && (userCount + assistantCount) == 0 {
+            return nil
+        }
+
+        // Skip warmup/prefill sessions (Claude Code internal)
+        if firstPrompt == "Warmup" {
             return nil
         }
 
@@ -403,6 +411,65 @@ enum SessionParser {
         return turns
     }
 
+    // MARK: - Agent Loading
+
+    /// Extract agentId from a Task tool_result text.
+    /// Pattern: "agentId: XXXXXXX" near the end of the output.
+    static func extractAgentId(from output: String) -> String? {
+        guard let range = output.range(of: #"agentId:\s*(\S+)"#, options: .regularExpression) else {
+            return nil
+        }
+        let match = output[range]
+        let parts = match.split(separator: ":", maxSplits: 1)
+        guard parts.count == 2 else { return nil }
+        return parts[1].trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Load and parse all agent JSONL files in a directory that share a sessionId.
+    /// Returns a map of agentId → [SessionTurn].
+    static func loadAgentTurns(sessionDir: URL, sessionId: String) -> [String: [SessionTurn]] {
+        let fm = FileManager.default
+        guard let contents = try? fm.contentsOfDirectory(
+            at: sessionDir,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else { return [:] }
+
+        let agentFiles = contents.filter {
+            $0.pathExtension == "jsonl" && $0.lastPathComponent.hasPrefix("agent-")
+        }
+
+        var result: [String: [SessionTurn]] = [:]
+        for file in agentFiles {
+            // Extract agentId from filename: "agent-XXXXXXX.jsonl"
+            let name = file.deletingPathExtension().lastPathComponent
+            let agentId = String(name.dropFirst("agent-".count))
+
+            // Verify this agent belongs to the same session
+            let messages = parseFile(at: file)
+            guard let first = messages.first, first.sessionId == sessionId else { continue }
+
+            // Skip the "Warmup" user message — show only real content
+            let filtered = messages.filter { msg in
+                if msg.type == .user {
+                    let texts = msg.contentBlocks.compactMap { block -> String? in
+                        if case .text(_, let text) = block { return text }
+                        return nil
+                    }
+                    if texts.count == 1, texts.first == "Warmup" { return false }
+                }
+                return true
+            }
+
+            let turns = groupIntoTurns(filtered)
+            if !turns.isEmpty {
+                result[agentId] = turns
+            }
+        }
+
+        return result
+    }
+
     // MARK: - Private Helpers
 
     private static func linesFromData(_ data: Data) -> [Data] {
@@ -482,21 +549,32 @@ enum SessionParser {
     /// Handles both string content and array-of-blocks content.
     /// Returns empty string for tool_result-only messages.
     private static func extractUserText(from message: [String: Any]) -> String {
+        var raw: String?
+
         // Case 1: content is a plain string
         if let text = message["content"] as? String {
-            return String(text.prefix(200))
+            raw = text
         }
 
         // Case 2: content is an array of blocks
-        if let blocks = message["content"] as? [[String: Any]] {
+        if raw == nil, let blocks = message["content"] as? [[String: Any]] {
             for block in blocks {
                 let blockType = block["type"] as? String ?? ""
                 if blockType == "text", let text = block["text"] as? String, !text.isEmpty {
-                    return String(text.prefix(200))
+                    raw = text
+                    break
                 }
             }
         }
 
-        return ""
+        guard let raw else { return "" }
+
+        // Collapse newlines into spaces for compact list display
+        let cleaned = raw
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        return String(cleaned.prefix(200))
     }
 }
