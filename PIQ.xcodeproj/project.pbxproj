@@ -11,36 +11,6 @@
 		A1000002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000002 /* AppState.swift */; };
 		A1000003 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000003 /* MenuBarView.swift */; };
 		A1000004 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000004 /* Assets.xcassets */; };
-		A1000005 /* ItemStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000011 /* ItemStatus.swift */; };
-		A1000006 /* Project.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000012 /* Project.swift */; };
-		A1000007 /* PRDItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000013 /* PRDItem.swift */; };
-		A1000008 /* EpicItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000014 /* EpicItem.swift */; };
-		A1000009 /* TaskItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000015 /* TaskItem.swift */; };
-		A1000010 /* ActivityEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000016 /* ActivityEvent.swift */; };
-		A1000011 /* FrontmatterParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000017 /* FrontmatterParser.swift */; };
-		A1000012 /* FrontmatterParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000018 /* FrontmatterParserTests.swift */; };
-		A1000013 /* ProjectConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000020 /* ProjectConfig.swift */; };
-		A1000014 /* ProjectScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000021 /* ProjectScanner.swift */; };
-		A1000015 /* ProjectStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000022 /* ProjectStore.swift */; };
-		A1000016 /* ProjectScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000023 /* ProjectScannerTests.swift */; };
-		A1000017 /* FileWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000024 /* FileWatcher.swift */; };
-		A1000018 /* FileWatcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000025 /* FileWatcherTests.swift */; };
-		A1000019 /* ProjectCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000026 /* ProjectCardView.swift */; };
-		A1000020 /* ProjectDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000027 /* ProjectDetailView.swift */; };
-		A1000021 /* StatusBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000028 /* StatusBadge.swift */; };
-		A1000022 /* ProgressBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000029 /* ProgressBarView.swift */; };
-		A1000023 /* ActivityStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000030 /* ActivityStore.swift */; };
-		A1000024 /* ActivityStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000031 /* ActivityStoreTests.swift */; };
-		A1000025 /* ActionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000032 /* ActionService.swift */; };
-		A1000026 /* ToastView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000033 /* ToastView.swift */; };
-		A1000027 /* Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000034 /* Settings.swift */; };
-		A1000028 /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000035 /* SettingsStore.swift */; };
-		A1000029 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000036 /* NotificationService.swift */; };
-		A1000030 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000037 /* SettingsView.swift */; };
-		A1000031 /* StatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000038 /* StatsView.swift */; };
-		A1000032 /* ActivityRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000039 /* ActivityRowView.swift */; };
-		A1000033 /* ScreenshotGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000040 /* ScreenshotGenerator.swift */; };
-		A1000034 /* ScreenshotGenerationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000041 /* ScreenshotGenerationTests.swift */; };
 		A1000050 /* SessionEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000050 /* SessionEntry.swift */; };
 		A1000051 /* SessionMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000051 /* SessionMessage.swift */; };
 		A1000052 /* SessionTurn.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000052 /* SessionTurn.swift */; };
@@ -74,37 +44,7 @@
 		A2000004 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A2000005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A2000010 /* PIQ.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PIQ.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A2000011 /* ItemStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemStatus.swift; sourceTree = "<group>"; };
-		A2000012 /* Project.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Project.swift; sourceTree = "<group>"; };
-		A2000013 /* PRDItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PRDItem.swift; sourceTree = "<group>"; };
-		A2000014 /* EpicItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpicItem.swift; sourceTree = "<group>"; };
-		A2000015 /* TaskItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskItem.swift; sourceTree = "<group>"; };
-		A2000016 /* ActivityEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityEvent.swift; sourceTree = "<group>"; };
-		A2000017 /* FrontmatterParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrontmatterParser.swift; sourceTree = "<group>"; };
-		A2000018 /* FrontmatterParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrontmatterParserTests.swift; sourceTree = "<group>"; };
 		A2000019 /* PIQTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PIQTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		A2000020 /* ProjectConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectConfig.swift; sourceTree = "<group>"; };
-		A2000021 /* ProjectScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectScanner.swift; sourceTree = "<group>"; };
-		A2000022 /* ProjectStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectStore.swift; sourceTree = "<group>"; };
-		A2000023 /* ProjectScannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectScannerTests.swift; sourceTree = "<group>"; };
-		A2000024 /* FileWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileWatcher.swift; sourceTree = "<group>"; };
-		A2000025 /* FileWatcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileWatcherTests.swift; sourceTree = "<group>"; };
-		A2000026 /* ProjectCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectCardView.swift; sourceTree = "<group>"; };
-		A2000027 /* ProjectDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectDetailView.swift; sourceTree = "<group>"; };
-		A2000028 /* StatusBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBadge.swift; sourceTree = "<group>"; };
-		A2000029 /* ProgressBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressBarView.swift; sourceTree = "<group>"; };
-		A2000030 /* ActivityStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityStore.swift; sourceTree = "<group>"; };
-		A2000031 /* ActivityStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityStoreTests.swift; sourceTree = "<group>"; };
-		A2000032 /* ActionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionService.swift; sourceTree = "<group>"; };
-		A2000033 /* ToastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToastView.swift; sourceTree = "<group>"; };
-		A2000034 /* Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings.swift; sourceTree = "<group>"; };
-		A2000035 /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStore.swift; sourceTree = "<group>"; };
-		A2000036 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
-		A2000037 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		A2000038 /* StatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsView.swift; sourceTree = "<group>"; };
-		A2000039 /* ActivityRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityRowView.swift; sourceTree = "<group>"; };
-		A2000040 /* ScreenshotGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotGenerator.swift; sourceTree = "<group>"; };
-		A2000041 /* ScreenshotGenerationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotGenerationTests.swift; sourceTree = "<group>"; };
 		A2000050 /* SessionEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionEntry.swift; sourceTree = "<group>"; };
 		A2000051 /* SessionMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionMessage.swift; sourceTree = "<group>"; };
 		A2000052 /* SessionTurn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTurn.swift; sourceTree = "<group>"; };
@@ -155,7 +95,6 @@
 				A4000003 /* Views */,
 				A4000004 /* Models */,
 				A4000005 /* Services */,
-				A4000006 /* Utilities */,
 				A4000007 /* Resources */,
 				A2000005 /* Info.plist */,
 			);
@@ -174,15 +113,7 @@
 		A4000003 /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				A2000039 /* ActivityRowView.swift */,
 				A2000003 /* MenuBarView.swift */,
-				A2000026 /* ProjectCardView.swift */,
-				A2000027 /* ProjectDetailView.swift */,
-				A2000037 /* SettingsView.swift */,
-				A2000038 /* StatsView.swift */,
-				A2000028 /* StatusBadge.swift */,
-				A2000029 /* ProgressBarView.swift */,
-				A2000033 /* ToastView.swift */,
 				A2000057 /* SessionWindowView.swift */,
 				A2000058 /* SessionListView.swift */,
 				A2000059 /* SessionRowView.swift */,
@@ -197,14 +128,6 @@
 		A4000004 /* Models */ = {
 			isa = PBXGroup;
 			children = (
-				A2000011 /* ItemStatus.swift */,
-				A2000012 /* Project.swift */,
-				A2000013 /* PRDItem.swift */,
-				A2000014 /* EpicItem.swift */,
-				A2000015 /* TaskItem.swift */,
-				A2000016 /* ActivityEvent.swift */,
-				A2000020 /* ProjectConfig.swift */,
-				A2000034 /* Settings.swift */,
 				A2000050 /* SessionEntry.swift */,
 				A2000051 /* SessionMessage.swift */,
 				A2000052 /* SessionTurn.swift */,
@@ -215,28 +138,12 @@
 		A4000005 /* Services */ = {
 			isa = PBXGroup;
 			children = (
-				A2000032 /* ActionService.swift */,
-				A2000030 /* ActivityStore.swift */,
-				A2000024 /* FileWatcher.swift */,
-				A2000017 /* FrontmatterParser.swift */,
-				A2000036 /* NotificationService.swift */,
-				A2000021 /* ProjectScanner.swift */,
-				A2000022 /* ProjectStore.swift */,
-				A2000035 /* SettingsStore.swift */,
 				A2000053 /* SessionParser.swift */,
 				A2000054 /* SessionScanner.swift */,
 				A2000055 /* SessionFileWatcher.swift */,
 				A2000056 /* SessionStore.swift */,
 			);
 			path = Services;
-			sourceTree = "<group>";
-		};
-		A4000006 /* Utilities */ = {
-			isa = PBXGroup;
-			children = (
-				A2000040 /* ScreenshotGenerator.swift */,
-			);
-			path = Utilities;
 			sourceTree = "<group>";
 		};
 		A4000007 /* Resources */ = {
@@ -250,11 +157,6 @@
 		A4000008 /* PIQTests */ = {
 			isa = PBXGroup;
 			children = (
-				A2000031 /* ActivityStoreTests.swift */,
-				A2000018 /* FrontmatterParserTests.swift */,
-				A2000025 /* FileWatcherTests.swift */,
-				A2000023 /* ProjectScannerTests.swift */,
-				A2000041 /* ScreenshotGenerationTests.swift */,
 			);
 			path = PIQTests;
 			sourceTree = "<group>";
@@ -362,31 +264,6 @@
 				A1000001 /* PIQApp.swift in Sources */,
 				A1000002 /* AppState.swift in Sources */,
 				A1000003 /* MenuBarView.swift in Sources */,
-				A1000005 /* ItemStatus.swift in Sources */,
-				A1000006 /* Project.swift in Sources */,
-				A1000007 /* PRDItem.swift in Sources */,
-				A1000008 /* EpicItem.swift in Sources */,
-				A1000009 /* TaskItem.swift in Sources */,
-				A1000010 /* ActivityEvent.swift in Sources */,
-				A1000011 /* FrontmatterParser.swift in Sources */,
-				A1000013 /* ProjectConfig.swift in Sources */,
-				A1000014 /* ProjectScanner.swift in Sources */,
-				A1000015 /* ProjectStore.swift in Sources */,
-				A1000017 /* FileWatcher.swift in Sources */,
-				A1000019 /* ProjectCardView.swift in Sources */,
-				A1000020 /* ProjectDetailView.swift in Sources */,
-				A1000021 /* StatusBadge.swift in Sources */,
-				A1000022 /* ProgressBarView.swift in Sources */,
-				A1000023 /* ActivityStore.swift in Sources */,
-				A1000025 /* ActionService.swift in Sources */,
-				A1000026 /* ToastView.swift in Sources */,
-				A1000027 /* Settings.swift in Sources */,
-				A1000028 /* SettingsStore.swift in Sources */,
-				A1000029 /* NotificationService.swift in Sources */,
-				A1000030 /* SettingsView.swift in Sources */,
-				A1000031 /* StatsView.swift in Sources */,
-				A1000032 /* ActivityRowView.swift in Sources */,
-				A1000033 /* ScreenshotGenerator.swift in Sources */,
 				A1000050 /* SessionEntry.swift in Sources */,
 				A1000051 /* SessionMessage.swift in Sources */,
 				A1000052 /* SessionTurn.swift in Sources */,
@@ -408,11 +285,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A1000012 /* FrontmatterParserTests.swift in Sources */,
-				A1000016 /* ProjectScannerTests.swift in Sources */,
-				A1000018 /* FileWatcherTests.swift in Sources */,
-				A1000024 /* ActivityStoreTests.swift in Sources */,
-				A1000034 /* ScreenshotGenerationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

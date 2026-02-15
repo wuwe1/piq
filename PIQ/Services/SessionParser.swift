@@ -129,6 +129,17 @@ enum SessionParser {
 
         guard let sid = sessionId else { return nil }
 
+        // Use file modification date as fallback for missing timestamps
+        let fileMtime = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+
+        let resolvedCreated = createdAt ?? fileMtime ?? Date()
+        let resolvedLastActivity = lastActivityAt ?? createdAt ?? fileMtime ?? Date()
+
+        // Skip empty sessions with no prompt and no messages
+        if firstPrompt.isEmpty && (userCount + assistantCount) == 0 {
+            return nil
+        }
+
         let projectPath = cwd ?? ""
         let projectName = (projectPath as NSString).lastPathComponent
 
@@ -141,8 +152,8 @@ enum SessionParser {
             model: model,
             gitBranch: gitBranch,
             slug: slug,
-            createdAt: createdAt ?? Date.distantPast,
-            lastActivityAt: lastActivityAt ?? createdAt ?? Date.distantPast,
+            createdAt: resolvedCreated,
+            lastActivityAt: resolvedLastActivity,
             jsonlURL: url,
             hasSubagents: hasSubagents
         )

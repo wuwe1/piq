@@ -53,8 +53,26 @@ struct SessionWindowView: View {
         .onAppear {
             if appState.sessionStore == nil {
                 appState.setupSessionStore()
-            } else {
-                sessionStore?.rescan()
+            }
+            // Pick up pending selection from menubar click
+            if let pending = appState.pendingSessionId {
+                selectedSessionId = pending
+                appState.pendingSessionId = nil
+                if let entry = filteredSessions.first(where: { $0.id == pending }) {
+                    Task {
+                        await sessionStore?.loadSessionDetail(entry: entry)
+                    }
+                }
+            }
+        }
+        .onChange(of: appState.pendingSessionId) { _, newValue in
+            guard let pending = newValue else { return }
+            selectedSessionId = pending
+            appState.pendingSessionId = nil
+            if let entry = filteredSessions.first(where: { $0.id == pending }) {
+                Task {
+                    await sessionStore?.loadSessionDetail(entry: entry)
+                }
             }
         }
     }

@@ -1,5 +1,16 @@
 import Foundation
 
+// MARK: - ClaudeStats
+
+struct ClaudeStats: Sendable {
+    let totalSessions: Int
+    let totalMessages: Int
+    let totalInputTokens: Int
+    let totalOutputTokens: Int
+
+    var totalTokens: Int { totalInputTokens + totalOutputTokens }
+}
+
 // MARK: - SessionStore
 
 /// Central state manager for Claude Code sessions.
@@ -111,6 +122,39 @@ final class SessionStore {
         loadedTurns = []
         loadedSessionId = nil
         isLoadingDetail = false
+    }
+
+    // MARK: - Aggregate Stats
+
+    /// Read aggregate stats from ~/.claude/stats-cache.json.
+    func loadStats() -> ClaudeStats? {
+        let url = FileManager.default.homeDirectoryForCurrentUser
+            .appending(path: ".claude/stats-cache.json")
+        guard let data = try? Data(contentsOf: url),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+
+        let totalSessions = json["totalSessions"] as? Int ?? 0
+        let totalMessages = json["totalMessages"] as? Int ?? 0
+
+        var totalInput = 0
+        var totalOutput = 0
+        if let modelUsage = json["modelUsage"] as? [String: [String: Any]] {
+            for (_, usage) in modelUsage {
+                totalInput += usage["inputTokens"] as? Int ?? 0
+                totalInput += usage["cacheReadInputTokens"] as? Int ?? 0
+                totalInput += usage["cacheCreationInputTokens"] as? Int ?? 0
+                totalOutput += usage["outputTokens"] as? Int ?? 0
+            }
+        }
+
+        return ClaudeStats(
+            totalSessions: totalSessions,
+            totalMessages: totalMessages,
+            totalInputTokens: totalInput,
+            totalOutputTokens: totalOutput
+        )
     }
 
     // MARK: - File Watching

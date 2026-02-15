@@ -3,29 +3,56 @@ import SwiftUI
 struct MenuBarView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.openWindow) private var openWindow
-    @State private var showStats = false
-    @State private var draggingID: UUID?
-    @State private var dragOffset: CGFloat = 0
-    @State private var cardHeights: [UUID: CGFloat] = [:]
+    @State private var searchText = ""
+    @State private var projectFilter: String?
+    @State private var stats: ClaudeStats?
+
+    private var sessionStore: SessionStore? { appState.sessionStore }
+
+    private var filteredSessions: [SessionEntry] {
+        guard let store = sessionStore else { return [] }
+        var result = store.sessions
+
+        if let filter = projectFilter {
+            result = result.filter { $0.projectPath == filter }
+        }
+
+        if !searchText.isEmpty {
+            let query = searchText.lowercased()
+            result = result.filter {
+                $0.firstPrompt.lowercased().contains(query) ||
+                $0.projectName.lowercased().contains(query) ||
+                $0.gitBranch.lowercased().contains(query)
+            }
+        }
+
+        return result
+    }
+
+    private var uniqueProjects: [(path: String, name: String)] {
+        guard let store = sessionStore else { return [] }
+        var seen = Set<String>()
+        var result: [(path: String, name: String)] = []
+        for session in store.sessions {
+            if !session.projectPath.isEmpty && seen.insert(session.projectPath).inserted {
+                result.append((session.projectPath, session.projectName))
+            }
+        }
+        return result.sorted { $0.name.lowercased() < $1.name.lowercased() }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             header
             Divider()
+            searchBar
+            Divider()
             content
             Divider()
             footer
         }
-        .overlay(alignment: .bottom) {
-            if let message = appState.toastMessage {
-                ToastView(message: message)
-                    .padding(.bottom, 40)
-                    .animation(.easeInOut(duration: 0.2), value: appState.toastMessage)
-            }
-        }
         .task {
-            // Initial rescanAll is done in PIQApp.task to ensure
-            // ActivityStore is set up before first scan.
+            stats = sessionStore?.loadStats()
         }
     }
 
@@ -38,148 +65,133 @@ struct MenuBarView: View {
             Text("PIQ")
                 .font(.headline)
             Spacer()
-            Text("\(appState.projects.count) projects")
+            Text("\(sessionStore?.sessions.count ?? 0) sessions")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
             Button {
-                showStats.toggle()
+                sessionStore?.rescan()
+                stats = sessionStore?.loadStats()
             } label: {
-                Image(systemName: showStats ? "list.bullet" : "chart.bar")
+                Image(systemName: "arrow.clockwise")
                     .font(.caption)
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .help(showStats ? "Show projects" : "Show stats")
+            .help("Refresh")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+    }
+
+    // MARK: - Search & Filter
+
+    private var searchBar: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.tertiary)
+                    .font(.caption)
+                TextField("Search sessions...", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(.caption)
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
+
+            if uniqueProjects.count > 1 {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 4) {
+                        filterChip(label: "All", isSelected: projectFilter == nil) {
+                            projectFilter = nil
+                        }
+                        ForEach(uniqueProjects, id: \.path) { project in
+                            filterChip(
+                                label: project.name,
+                                isSelected: projectFilter == project.path
+                            ) {
+                                projectFilter = project.path
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
     }
 
     // MARK: - Content
 
     @ViewBuilder
     private var content: some View {
-        if showStats {
-            StatsView()
-        } else if appState.projects.isEmpty {
-            emptyState
+        if sessionStore?.isLoading == true {
+            ProgressView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if filteredSessions.isEmpty {
+            VStack(spacing: 12) {
+                Spacer()
+                Image(systemName: "bubble.left.and.bubble.right")
+                    .font(.system(size: 28))
+                    .foregroundStyle(.tertiary)
+                Text(searchText.isEmpty ? "No sessions" : "No matches")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .frame(maxWidth: .infinity)
         } else {
-            projectList
-        }
-    }
-
-    private var emptyState: some View {
-        VStack(spacing: 12) {
-            Spacer()
-            Image(systemName: "tray")
-                .font(.system(size: 32))
-                .foregroundStyle(.tertiary)
-            Text("No projects")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            Text("Add a scan root via config")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private var projectList: some View {
-        ScrollView {
-            VStack(spacing: 6) {
-                ForEach(Array(appState.projects.enumerated()), id: \.element.id) { index, project in
-                    let isDragging = draggingID == project.id
-                    ProjectCardView(project: project, index: index, total: appState.projects.count)
-                        .background(GeometryReader { geo in
-                            Color.clear.onAppear {
-                                cardHeights[project.id] = geo.size.height + 8
-                            }
-                        })
-                        .offset(y: isDragging ? dragOffset : shiftOffset(for: index))
-                        .zIndex(isDragging ? 1 : 0)
-                        .opacity(isDragging ? 0.85 : 1)
-                        .gesture(
-                            DragGesture()
-                                .onChanged { value in
-                                    if draggingID == nil {
-                                        draggingID = project.id
-                                    }
-                                    guard draggingID == project.id else { return }
-                                    dragOffset = value.translation.height
-                                }
-                                .onEnded { _ in
-                                    guard draggingID == project.id else { return }
-                                    let newIndex = targetIndex(from: index)
-                                    withAnimation(.easeInOut(duration: 0.15)) {
-                                        draggingID = nil
-                                        dragOffset = 0
-                                    }
-                                    if newIndex != index {
-                                        appState.moveProjectByIndex(from: index, to: newIndex)
-                                    }
-                                }
-                        )
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(filteredSessions) { session in
+                        sessionRow(session)
+                        if session.id != filteredSessions.last?.id {
+                            Divider().padding(.horizontal, 12)
+                        }
+                    }
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
         }
     }
 
-    /// Calculate how far to shift a non-dragged card to make room.
-    private func shiftOffset(for index: Int) -> CGFloat {
-        guard let dragID = draggingID,
-              let dragIndex = appState.projects.firstIndex(where: { $0.id == dragID }),
-              index != dragIndex else { return 0 }
-
-        let h = cardHeights[dragID] ?? 70
-        let steps = stepsFromDrag(dragIndex: dragIndex)
-
-        if dragOffset > 0 {
-            // Dragging down: shift items between dragIndex+1..dragIndex+steps up
-            if index > dragIndex && index <= dragIndex + steps {
-                return -h
-            }
-        } else {
-            // Dragging up: shift items between dragIndex+steps..dragIndex-1 down
-            if index < dragIndex && index >= dragIndex + steps {
-                return h
-            }
+    private func sessionRow(_ session: SessionEntry) -> some View {
+        Button {
+            appState.pendingSessionId = session.id
+            NSApp.activate(ignoringOtherApps: true)
+            openWindow(id: "sessions")
+        } label: {
+            SessionRowView(entry: session)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .contentShape(Rectangle())
         }
-        return 0
-    }
-
-    /// How many positions the dragged card has moved past.
-    private func stepsFromDrag(dragIndex: Int) -> Int {
-        let avgH = cardHeights.values.isEmpty ? 70.0 : cardHeights.values.reduce(0, +) / Double(cardHeights.values.count)
-        let threshold = avgH * 0.5
-        if dragOffset > threshold {
-            return min(Int((dragOffset + threshold) / avgH), appState.projects.count - 1 - dragIndex)
-        } else if dragOffset < -threshold {
-            return max(Int((dragOffset - threshold) / avgH), -dragIndex)
-        }
-        return 0
-    }
-
-    /// Calculate the target index after drag ends.
-    private func targetIndex(from currentIndex: Int) -> Int {
-        let steps = stepsFromDrag(dragIndex: currentIndex)
-        return currentIndex + steps
+        .buttonStyle(.plain)
     }
 
     // MARK: - Footer
 
     private var footer: some View {
-        HStack {
-            Button {
-                appState.rescanAll()
-            } label: {
-                Label("Refresh", systemImage: "arrow.clockwise")
-                    .font(.footnote)
+        HStack(spacing: 8) {
+            if let stats {
+                Text("\(formatCount(stats.totalMessages)) msgs")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text("·")
+                    .foregroundStyle(.quaternary)
+                Text("\(formatCount(stats.totalTokens)) tokens")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
 
             Spacer()
 
@@ -187,23 +199,12 @@ struct MenuBarView: View {
                 NSApp.activate(ignoringOtherApps: true)
                 openWindow(id: "sessions")
             } label: {
-                Image(systemName: "bubble.left.and.bubble.right")
-                    .font(.footnote)
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .font(.caption2)
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .help("Sessions")
-
-            Button {
-                NSApp.activate(ignoringOtherApps: true)
-                openWindow(id: "settings")
-            } label: {
-                Image(systemName: "gear")
-                    .font(.footnote)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-            .help("Settings")
+            .help("Open window")
 
             Button("Quit") {
                 NSApplication.shared.terminate(nil)
@@ -214,5 +215,34 @@ struct MenuBarView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+    }
+
+    // MARK: - Helpers
+
+    private func filterChip(label: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.caption2)
+                .lineLimit(1)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(
+                    isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.quaternary),
+                    in: Capsule()
+                )
+                .foregroundStyle(isSelected ? .white : .primary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func formatCount(_ count: Int) -> String {
+        if count >= 1_000_000_000 {
+            return String(format: "%.1fB", Double(count) / 1_000_000_000)
+        } else if count >= 1_000_000 {
+            return String(format: "%.1fM", Double(count) / 1_000_000)
+        } else if count >= 1_000 {
+            return String(format: "%.1fK", Double(count) / 1_000)
+        }
+        return "\(count)"
     }
 }
