@@ -43,6 +43,9 @@ enum SessionParser {
 
         var userCount = 0
         var assistantCount = 0
+        var userTurnCount = 0
+        var inputTokens = 0
+        var outputTokens = 0
 
         for lineData in headLines {
             guard let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any] else { continue }
@@ -74,9 +77,23 @@ enum SessionParser {
                 createdAt = parseISO8601(ts)
             }
 
-            if lineType == "user" || lineType == "assistant" {
-                if lineType == "user" { userCount += 1 }
-                if lineType == "assistant" { assistantCount += 1 }
+            if lineType == "user" {
+                userCount += 1
+                // Count real user turns (with text content, not tool_result-only)
+                if let msg = json["message"] as? [String: Any] {
+                    if isRealUserMessage(msg) {
+                        userTurnCount += 1
+                    }
+                }
+            }
+            if lineType == "assistant" {
+                assistantCount += 1
+                // Extract token usage
+                if let msg = json["message"] as? [String: Any],
+                   let usage = msg["usage"] as? [String: Any] {
+                    inputTokens += usage["input_tokens"] as? Int ?? 0
+                    outputTokens += usage["output_tokens"] as? Int ?? 0
+                }
             }
 
             // Extract model from assistant message
@@ -119,8 +136,20 @@ enum SessionParser {
 
             // Only count messages not already seen in the head
             if let uuid, !seenUUIDs.contains(uuid) {
-                if lineType == "user" { userCount += 1 }
-                if lineType == "assistant" { assistantCount += 1 }
+                if lineType == "user" {
+                    userCount += 1
+                    if let msg = json["message"] as? [String: Any], isRealUserMessage(msg) {
+                        userTurnCount += 1
+                    }
+                }
+                if lineType == "assistant" {
+                    assistantCount += 1
+                    if let msg = json["message"] as? [String: Any],
+                       let usage = msg["usage"] as? [String: Any] {
+                        inputTokens += usage["input_tokens"] as? Int ?? 0
+                        outputTokens += usage["output_tokens"] as? Int ?? 0
+                    }
+                }
             }
 
             // Update metadata from tail if not found in head
@@ -167,6 +196,7 @@ enum SessionParser {
             projectPath: projectPath,
             projectName: projectName,
             firstPrompt: firstPrompt,
+            userTurnCount: userTurnCount,
             messageCount: userCount + assistantCount,
             model: model,
             gitBranch: gitBranch,
@@ -174,7 +204,9 @@ enum SessionParser {
             createdAt: resolvedCreated,
             lastActivityAt: resolvedLastActivity,
             jsonlURL: url,
-            hasSubagents: hasSubagents
+            hasSubagents: hasSubagents,
+            inputTokens: inputTokens,
+            outputTokens: outputTokens
         )
     }
 
@@ -526,6 +558,17 @@ enum SessionParser {
 
     private static func parseISO8601(_ string: String) -> Date? {
         iso8601Formatter.date(from: string) ?? iso8601FallbackFormatter.date(from: string)
+    }
+
+    /// Check if a user message contains real text input (not just tool_result blocks).
+    private static func isRealUserMessage(_ message: [String: Any]) -> Bool {
+        if let text = message["content"] as? String, !text.isEmpty {
+            return true
+        }
+        if let blocks = message["content"] as? [[String: Any]] {
+            return blocks.contains { ($0["type"] as? String) == "text" }
+        }
+        return false
     }
 
     /// Extract human-readable text from a user message's content field.

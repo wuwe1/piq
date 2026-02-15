@@ -52,7 +52,9 @@ struct MenuBarView: View {
             footer
         }
         .task {
-            stats = sessionStore?.loadStats()
+            stats = await Task.detached { [sessionStore] in
+                sessionStore?.loadStats()
+            }.value
         }
     }
 
@@ -70,7 +72,10 @@ struct MenuBarView: View {
                 .foregroundStyle(.tertiary)
             Button {
                 sessionStore?.rescan()
-                stats = sessionStore?.loadStats()
+                Task.detached { [sessionStore] in
+                    let newStats = sessionStore?.loadStats()
+                    await MainActor.run { stats = newStats }
+                }
             } label: {
                 Image(systemName: "arrow.clockwise")
                     .font(.caption)
@@ -214,9 +219,12 @@ struct MenuBarView: View {
                     .foregroundStyle(.secondary)
                 Text("·")
                     .foregroundStyle(.quaternary)
-                Text("\(formatCount(stats.totalTokens)) tokens")
+                Text("\(formatCount(stats.totalInputTokens)) in")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.blue.opacity(0.8))
+                Text("\(formatCount(stats.totalOutputTokens)) out")
+                    .font(.caption2)
+                    .foregroundStyle(.green.opacity(0.8))
             }
 
             Spacer()

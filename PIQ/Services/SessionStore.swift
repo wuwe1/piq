@@ -7,7 +7,10 @@ struct ClaudeStats: Sendable {
     let totalMessages: Int
     let totalInputTokens: Int
     let totalOutputTokens: Int
+    let totalCacheReadTokens: Int
+    let totalCacheCreationTokens: Int
 
+    /// Actual API tokens (excluding cache)
     var totalTokens: Int { totalInputTokens + totalOutputTokens }
 }
 
@@ -29,17 +32,21 @@ final class SessionStore {
 
     // MARK: - Scanning
 
-    /// Full rescan of all session files.
+    /// Full rescan of all session files (runs IO on background thread).
     func rescan() {
         isLoading = true
-        let scanned = SessionScanner.scanAll()
-        sessions = scanned
-        // Update mtime cache
-        mtimeCache = [:]
-        for entry in scanned {
-            mtimeCache[entry.jsonlURL] = SessionScanner.modificationDate(of: entry.jsonlURL)
+        Task.detached(priority: .userInitiated) {
+            let scanned = SessionScanner.scanAll()
+            var cache: [URL: Date] = [:]
+            for entry in scanned {
+                cache[entry.jsonlURL] = SessionScanner.modificationDate(of: entry.jsonlURL)
+            }
+            await MainActor.run { [scanned, cache] in
+                self.sessions = scanned
+                self.mtimeCache = cache
+                self.isLoading = false
+            }
         }
-        isLoading = false
     }
 
     /// Incremental update: only re-parse files whose mtime changed.
@@ -152,7 +159,7 @@ final class SessionStore {
     // MARK: - Aggregate Stats
 
     /// Read aggregate stats from ~/.claude/stats-cache.json.
-    func loadStats() -> ClaudeStats? {
+    nonisolated func loadStats() -> ClaudeStats? {
         let url = FileManager.default.homeDirectoryForCurrentUser
             .appending(path: ".claude/stats-cache.json")
         guard let data = try? Data(contentsOf: url),
@@ -165,12 +172,14 @@ final class SessionStore {
 
         var totalInput = 0
         var totalOutput = 0
+        var totalCacheRead = 0
+        var totalCacheCreation = 0
         if let modelUsage = json["modelUsage"] as? [String: [String: Any]] {
             for (_, usage) in modelUsage {
                 totalInput += usage["inputTokens"] as? Int ?? 0
-                totalInput += usage["cacheReadInputTokens"] as? Int ?? 0
-                totalInput += usage["cacheCreationInputTokens"] as? Int ?? 0
                 totalOutput += usage["outputTokens"] as? Int ?? 0
+                totalCacheRead += usage["cacheReadInputTokens"] as? Int ?? 0
+                totalCacheCreation += usage["cacheCreationInputTokens"] as? Int ?? 0
             }
         }
 
@@ -178,7 +187,9 @@ final class SessionStore {
             totalSessions: totalSessions,
             totalMessages: totalMessages,
             totalInputTokens: totalInput,
-            totalOutputTokens: totalOutput
+            totalOutputTokens: totalOutput,
+            totalCacheReadTokens: totalCacheRead,
+            totalCacheCreationTokens: totalCacheCreation
         )
     }
 

@@ -101,6 +101,7 @@ enum SessionScanner {
                     projectPath: best.projectPath,
                     projectName: best.projectName,
                     firstPrompt: best.firstPrompt,
+                    userTurnCount: group.reduce(0) { $0 + $1.userTurnCount },
                     messageCount: group.reduce(0) { $0 + $1.messageCount },
                     model: latest.model.isEmpty ? best.model : latest.model,
                     gitBranch: latest.gitBranch.isEmpty ? best.gitBranch : latest.gitBranch,
@@ -108,7 +109,9 @@ enum SessionScanner {
                     createdAt: best.createdAt,
                     lastActivityAt: latest.lastActivityAt,
                     jsonlURL: latest.jsonlURL,
-                    hasSubagents: group.contains { $0.hasSubagents }
+                    hasSubagents: group.contains { $0.hasSubagents },
+                    inputTokens: group.reduce(0) { $0 + $1.inputTokens },
+                    outputTokens: group.reduce(0) { $0 + $1.outputTokens }
                 )
             }
             return best

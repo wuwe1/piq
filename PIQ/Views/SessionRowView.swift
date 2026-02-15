@@ -36,11 +36,18 @@ struct SessionRowView: View {
                         color: .orange
                     )
                 }
-                if entry.messageCount > 0 {
+                if entry.userTurnCount > 0 {
                     metaBadge(
-                        text: "\(entry.messageCount)",
-                        icon: "message",
+                        text: "\(entry.userTurnCount)",
+                        icon: "text.bubble",
                         color: .blue
+                    )
+                }
+                if entry.outputTokens > 0 {
+                    metaBadge(
+                        text: formatTokens(entry.inputTokens + entry.outputTokens),
+                        icon: "sparkle",
+                        color: .green
                     )
                 }
                 if entry.hasSubagents {
@@ -73,6 +80,15 @@ struct SessionRowView: View {
         if model.contains("sonnet") { return "Sonnet" }
         if model.contains("haiku") { return "Haiku" }
         return model
+    }
+
+    private func formatTokens(_ count: Int) -> String {
+        if count >= 1_000_000 {
+            return String(format: "%.1fM", Double(count) / 1_000_000)
+        } else if count >= 1_000 {
+            return String(format: "%.1fK", Double(count) / 1_000)
+        }
+        return "\(count)"
     }
 
     private func relativeTime(_ date: Date) -> String {
