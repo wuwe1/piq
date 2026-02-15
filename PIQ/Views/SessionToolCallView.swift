@@ -82,53 +82,22 @@ struct SessionToolCallView: View {
 
             Spacer()
 
-            Button {
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    showInput.toggle()
+            HStack(spacing: 4) {
+                togglePill("Input", icon: "arrow.right.circle", isOn: showInput) {
+                    withAnimation(.easeInOut(duration: 0.15)) { showInput.toggle() }
                 }
-            } label: {
-                HStack(spacing: 2) {
-                    Image(systemName: "chevron.right")
-                        .rotationEffect(.degrees(showInput ? 90 : 0))
-                    Text("Input")
-                }
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
 
-            if pair.output != nil {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        showOutput.toggle()
+                if pair.output != nil {
+                    togglePill("Output", icon: "arrow.left.circle", isOn: showOutput) {
+                        withAnimation(.easeInOut(duration: 0.15)) { showOutput.toggle() }
                     }
-                } label: {
-                    HStack(spacing: 2) {
-                        Image(systemName: "chevron.right")
-                            .rotationEffect(.degrees(showOutput ? 90 : 0))
-                        Text("Output")
-                    }
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.plain)
-            }
 
-            if pair.agentTurns != nil {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        showAgent.toggle()
+                if pair.agentTurns != nil {
+                    togglePill("Agent", icon: "person.2", isOn: showAgent, tint: .cyan) {
+                        withAnimation(.easeInOut(duration: 0.15)) { showAgent.toggle() }
                     }
-                } label: {
-                    HStack(spacing: 2) {
-                        Image(systemName: "chevron.right")
-                            .rotationEffect(.degrees(showAgent ? 90 : 0))
-                        Text("Agent")
-                    }
-                    .font(.caption2)
-                    .foregroundStyle(.cyan)
                 }
-                .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, 10)
@@ -192,6 +161,30 @@ struct SessionToolCallView: View {
                 .background(.cyan.opacity(0.03))
             }
         }
+    }
+
+    // MARK: - Toggle Pill
+
+    private func togglePill(
+        _ label: String,
+        icon: String,
+        isOn: Bool,
+        tint: Color? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        let color = tint ?? toolInfo.color
+        return Button(action: action) {
+            HStack(spacing: 3) {
+                Image(systemName: icon)
+                Text(label)
+            }
+            .font(.system(size: 9, weight: .medium))
+            .foregroundStyle(isOn ? .white : color)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2.5)
+            .background(isOn ? color.opacity(0.8) : color.opacity(0.1), in: Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Display Name
