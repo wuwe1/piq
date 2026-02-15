@@ -53,10 +53,16 @@ enum SessionScanner {
     static func scanAll() -> [SessionEntry] {
         let projects = discoverProjects()
         let allSessions = projects.flatMap { scanSessions(in: $0) }
+        return deduplicateSessions(allSessions)
+    }
 
+    /// Deduplicate sessions by resolving continuation chains.
+    ///
+    /// Claude Code creates continuation files when resuming a session:
+    /// the new file's sessionId references the previous file's UUID, forming a chain.
+    /// We resolve the full chain and keep one entry per logical session.
+    static func deduplicateSessions(_ allSessions: [SessionEntry]) -> [SessionEntry] {
         // Map each file's UUID (from filename) to the sessionId found in its content.
-        // If fileUUID == sessionId, the file is the root of the session.
-        // If fileUUID != sessionId, sessionId references the parent file.
         var fileToSessionId: [String: String] = [:]
         for entry in allSessions {
             let fileUUID = entry.jsonlURL.deletingPathExtension().lastPathComponent
@@ -89,7 +95,6 @@ enum SessionScanner {
                 !$0.firstPrompt.hasPrefix("[Request interrupted")
             } ?? latest
 
-            // If the best prompt entry isn't the most recent, update activity time
             if best.id != latest.id, latest.lastActivityAt > best.lastActivityAt {
                 return SessionEntry(
                     id: best.id,

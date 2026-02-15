@@ -100,14 +100,25 @@ enum SessionParser {
             }
         }
 
-        // Parse tail for last activity and additional counts
+        // Parse tail for last activity and additional counts.
+        // Use seen UUIDs to avoid double-counting when head and tail overlap.
+        var seenUUIDs = Set<String>()
+        for lineData in headLines {
+            if let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
+               let uuid = json["uuid"] as? String {
+                seenUUIDs.insert(uuid)
+            }
+        }
+
         var lastActivityAt: Date?
         for lineData in tailLines.reversed() {
             guard let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any] else { continue }
 
             let lineType = json["type"] as? String ?? ""
+            let uuid = json["uuid"] as? String
 
-            if lineType == "user" || lineType == "assistant" {
+            // Only count messages not already seen in the head
+            if let uuid, !seenUUIDs.contains(uuid) {
                 if lineType == "user" { userCount += 1 }
                 if lineType == "assistant" { assistantCount += 1 }
             }
@@ -282,27 +293,17 @@ enum SessionParser {
     static func groupIntoTurns(_ messages: [SessionMessage]) -> [SessionTurn] {
         var turns: [SessionTurn] = []
         var currentUserMsg: SessionMessage?
-        var currentAssistantMsgs: [SessionMessage] = []
+        // Collects assistant messages AND tool_result user messages for the current turn.
+        var currentTurnMessages: [SessionMessage] = []
         var currentSystemEvents: [SessionMessage] = []
-        var toolUseMap: [String: (name: String, serverName: String?, inputJSON: String)] = [:]  // toolId -> info
 
         func flushTurn() {
-            guard currentUserMsg != nil || !currentAssistantMsgs.isEmpty else { return }
+            guard currentUserMsg != nil || !currentTurnMessages.isEmpty else { return }
 
-            // Build tool pairs
+            // Collect tool_use blocks into pairs (initially without output)
             var toolPairs: [ToolCallPair] = []
-            for assistantMsg in currentAssistantMsgs {
-                for block in assistantMsg.contentBlocks {
-                    if case .toolUse(_, let toolId, let name, let serverName, let inputJSON) = block {
-                        toolUseMap[toolId] = (name, serverName, inputJSON)
-                    }
-                }
-            }
-
-            // Match tool results from user messages that follow
-            // (tool results come as user messages with tool_result content blocks)
-            for assistantMsg in currentAssistantMsgs {
-                for block in assistantMsg.contentBlocks {
+            for msg in currentTurnMessages {
+                for block in msg.contentBlocks {
                     if case .toolUse(_, let toolId, let name, let serverName, let inputJSON) = block {
                         toolPairs.append(ToolCallPair(
                             id: toolId,
@@ -316,29 +317,26 @@ enum SessionParser {
                 }
             }
 
-            // Find tool results in interleaved user messages
-            let allMsgs = currentAssistantMsgs
-            for msg in allMsgs {
-                if msg.type == .user {
-                    for block in msg.contentBlocks {
-                        if case .toolResult(_, let toolUseId, let content, let isError) = block {
-                            if let idx = toolPairs.firstIndex(where: { $0.id == toolUseId }) {
-                                toolPairs[idx] = ToolCallPair(
-                                    id: toolUseId,
-                                    name: toolPairs[idx].name,
-                                    serverName: toolPairs[idx].serverName,
-                                    inputJSON: toolPairs[idx].inputJSON,
-                                    output: content,
-                                    isError: isError
-                                )
-                            }
+            // Match tool_result blocks to their corresponding tool_use pairs
+            for msg in currentTurnMessages where msg.type == .user {
+                for block in msg.contentBlocks {
+                    if case .toolResult(_, let toolUseId, let content, let isError) = block {
+                        if let idx = toolPairs.firstIndex(where: { $0.id == toolUseId }) {
+                            toolPairs[idx] = ToolCallPair(
+                                id: toolUseId,
+                                name: toolPairs[idx].name,
+                                serverName: toolPairs[idx].serverName,
+                                inputJSON: toolPairs[idx].inputJSON,
+                                output: content,
+                                isError: isError
+                            )
                         }
                     }
                 }
             }
 
             // Calculate total usage
-            let usages = currentAssistantMsgs.compactMap(\.usage)
+            let usages = currentTurnMessages.compactMap(\.usage)
             let totalUsage = usages.isEmpty ? nil : usages.reduce(TokenUsage.zero, +)
 
             // Get duration from system events
@@ -346,18 +344,17 @@ enum SessionParser {
                 .first(where: { $0.systemSubtype == "turn_duration" })?.durationMs
 
             turns.append(SessionTurn(
-                id: currentUserMsg?.id ?? currentAssistantMsgs.first?.id ?? UUID().uuidString,
+                id: currentUserMsg?.id ?? currentTurnMessages.first?.id ?? UUID().uuidString,
                 userMessage: currentUserMsg,
-                assistantMessages: currentAssistantMsgs.filter { $0.type == .assistant },
+                assistantMessages: currentTurnMessages.filter { $0.type == .assistant },
                 toolPairs: toolPairs,
                 durationMs: duration,
                 totalUsage: totalUsage
             ))
 
             currentUserMsg = nil
-            currentAssistantMsgs = []
+            currentTurnMessages = []
             currentSystemEvents = []
-            toolUseMap = [:]
         }
 
         for message in messages {
@@ -371,21 +368,7 @@ enum SessionParser {
                     }
 
                 if hasOnlyToolResults {
-                    // This is a tool result response, attach to current turn
-                    // Match results to pending tool calls
-                    for block in message.contentBlocks {
-                        if case .toolResult(_, let toolUseId, let content, let isError) = block {
-                            if let idx = currentAssistantMsgs.lastIndex(where: { assistantMsg in
-                                assistantMsg.contentBlocks.contains(where: {
-                                    if case .toolUse(_, let tid, _, _, _) = $0 { return tid == toolUseId }
-                                    return false
-                                })
-                            }) {
-                                // Store the result - we'll pair it later in flushTurn
-                            }
-                        }
-                    }
-                    currentAssistantMsgs.append(message) // Keep for pairing
+                    currentTurnMessages.append(message)
                 } else {
                     // New human turn
                     flushTurn()
@@ -393,7 +376,7 @@ enum SessionParser {
                 }
 
             case .assistant:
-                currentAssistantMsgs.append(message)
+                currentTurnMessages.append(message)
 
             case .system:
                 currentSystemEvents.append(message)

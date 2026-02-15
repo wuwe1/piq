@@ -127,12 +127,19 @@ struct SessionToolCallView: View {
         VStack(alignment: .leading, spacing: 0) {
             Divider().padding(.horizontal, 10)
             ScrollView {
-                Text(output.prefix(5000))
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(pair.isError ? .red : .secondary)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(10)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(output.prefix(5000))
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(pair.isError ? .red : .secondary)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if output.count > 5000 {
+                        Text("… truncated (\(output.count) chars)")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .padding(10)
             }
             .frame(maxHeight: 200)
         }

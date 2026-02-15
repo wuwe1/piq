@@ -83,7 +83,8 @@ final class SessionStore {
         if sessions.count != before { updated = true }
 
         if updated {
-            sessions.sort { $0.lastActivityAt > $1.lastActivityAt }
+            // Re-run full deduplication to handle continuation chains
+            sessions = SessionScanner.deduplicateSessions(sessions)
         }
 
         // If the currently loaded session was updated, refresh it
