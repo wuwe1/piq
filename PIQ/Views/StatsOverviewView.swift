@@ -38,7 +38,7 @@ struct StatsOverviewView: View {
             buckets[startHour.addingTimeInterval(Double(i) * 3600)] = 0
         }
         for s in sessions {
-            let hour = calendar.dateInterval(of: .hour, for: s.createdAt)?.start ?? s.createdAt
+            let hour = calendar.dateInterval(of: .hour, for: s.lastActivityAt)?.start ?? s.lastActivityAt
             if hour >= startHour, buckets[hour] != nil {
                 buckets[hour, default: 0] += s.messageCount
             }
