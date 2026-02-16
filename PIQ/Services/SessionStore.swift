@@ -58,6 +58,66 @@ struct ClaudeStats: Sendable {
     var totalTokens: Int { totalInputTokens + totalOutputTokens }
 }
 
+// MARK: - StatsCache (Claude Code stats-cache.json)
+
+/// Parsed representation of ~/.claude/stats-cache.json written by Claude Code.
+struct StatsCache: Sendable {
+    let dailyActivity: [DailyActivityCached]
+    let dailyModelTokens: [DailyModelTokens]
+    let totalToolCalls: Int
+
+    struct DailyActivityCached: Identifiable, Sendable {
+        var id: String { date }
+        let date: String
+        let sessionCount: Int
+        let toolCallCount: Int
+    }
+
+    struct DailyModelTokens: Identifiable, Sendable {
+        var id: String { date }
+        let date: String
+        let tokensByModel: [String: Int]   // model id → output tokens
+    }
+
+    static func load() -> StatsCache? {
+        let url = FileManager.default.homeDirectoryForCurrentUser
+            .appending(path: ".claude/stats-cache.json")
+        guard let data = try? Data(contentsOf: url),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+
+        var daily: [DailyActivityCached] = []
+        if let arr = json["dailyActivity"] as? [[String: Any]] {
+            for item in arr {
+                guard let date = item["date"] as? String else { continue }
+                daily.append(DailyActivityCached(
+                    date: date,
+                    sessionCount: item["sessionCount"] as? Int ?? 0,
+                    toolCallCount: item["toolCallCount"] as? Int ?? 0
+                ))
+            }
+        }
+
+        var modelTokens: [DailyModelTokens] = []
+        if let arr = json["dailyModelTokens"] as? [[String: Any]] {
+            for item in arr {
+                guard let date = item["date"] as? String,
+                      let byModel = item["tokensByModel"] as? [String: Int] else { continue }
+                modelTokens.append(DailyModelTokens(date: date, tokensByModel: byModel))
+            }
+        }
+
+        let totalTools = daily.reduce(0) { $0 + $1.toolCallCount }
+
+        return StatsCache(
+            dailyActivity: daily,
+            dailyModelTokens: modelTokens,
+            totalToolCalls: totalTools
+        )
+    }
+}
+
 // MARK: - SessionIndex (Persistent Cache)
 
 struct SessionIndex: Codable, Sendable {
@@ -117,6 +177,7 @@ final class SessionStore {
     private(set) var isLoading = false
     private(set) var scanProgress: ScanProgress?
     private(set) var stats: ClaudeStats?
+    private(set) var statsCache: StatsCache?
     private var fileWatcher: SessionFileWatcher?
     private var sessionIndex = SessionIndex()
 
@@ -165,11 +226,13 @@ final class SessionStore {
             }
             let sorted = result.allEntries.sorted { $0.lastActivityAt > $1.lastActivityAt }
             let newStats = Self.computeStats(from: sorted)
+            let cache = StatsCache.load()
             result.updatedIndex.save()
             await MainActor.run {
                 self.sessions = sorted
                 self.sessionIndex = result.updatedIndex
                 self.stats = newStats
+                self.statsCache = cache
                 self.scanProgress = nil
                 self.isLoading = false
             }
@@ -189,6 +252,7 @@ final class SessionStore {
 
             let sorted = result.allEntries.sorted { $0.lastActivityAt > $1.lastActivityAt }
             let newStats = Self.computeStats(from: sorted)
+            let cache = StatsCache.load()
             result.updatedIndex.save()
 
             // Check if loaded session needs detail refresh
@@ -203,6 +267,7 @@ final class SessionStore {
                 self.sessions = sorted
                 self.sessionIndex = result.updatedIndex
                 self.stats = newStats
+                self.statsCache = cache
 
                 if let entry = detailEntry {
                     Task {

@@ -267,11 +267,11 @@ struct SessionWindowView: View {
             }
         case .overview:
             if let stats = sessionStore?.stats, let store = sessionStore {
-                StatsOverviewView(stats: stats, sessions: store.sessions)
+                StatsOverviewView(stats: stats, sessions: store.sessions, statsCache: store.statsCache)
             }
         case nil:
             if let stats = sessionStore?.stats, let store = sessionStore {
-                StatsOverviewView(stats: stats, sessions: store.sessions)
+                StatsOverviewView(stats: stats, sessions: store.sessions, statsCache: store.statsCache)
             } else {
                 ContentUnavailableView {
                     Label("Select a Session", systemImage: "bubble.left.and.bubble.right")

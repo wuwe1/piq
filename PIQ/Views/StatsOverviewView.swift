@@ -4,12 +4,14 @@ import Charts
 struct StatsOverviewView: View {
     let stats: ClaudeStats
     let sessions: [SessionEntry]
+    let statsCache: StatsCache?
     let projectGroups: [(name: String, path: String, count: Int, tokens: Int)]
     let recentHourly: [(date: Date, count: Int)]
 
-    init(stats: ClaudeStats, sessions: [SessionEntry]) {
+    init(stats: ClaudeStats, sessions: [SessionEntry], statsCache: StatsCache? = nil) {
         self.stats = stats
         self.sessions = sessions
+        self.statsCache = statsCache
 
         var groups: [String: (name: String, count: Int, tokens: Int)] = [:]
         for session in sessions {
@@ -55,6 +57,9 @@ struct StatsOverviewView: View {
             VStack(spacing: 20) {
                 summaryCards
                 dailyActivityChart
+                if statsCache != nil {
+                    dailyModelTokensChart
+                }
                 activeHoursChart
                 modelUsageChart
                 projectsList
@@ -67,6 +72,13 @@ struct StatsOverviewView: View {
 
     // MARK: - Summary Cards
 
+    private var avgTurnsPerSession: String {
+        guard stats.totalSessions > 0 else { return "0" }
+        let avg = Double(stats.totalMessages) / Double(stats.totalSessions) / 2.0
+        if avg >= 100 { return "\(Int(avg))" }
+        return String(format: "%.1f", avg)
+    }
+
     private var summaryCards: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
             StatCard(
@@ -74,6 +86,12 @@ struct StatsOverviewView: View {
                 value: "\(stats.totalSessions)",
                 label: "Sessions",
                 color: .blue
+            )
+            StatCard(
+                icon: "folder",
+                value: "\(projectGroups.count)",
+                label: "Projects",
+                color: .indigo
             )
             StatCard(
                 icon: "arrow.down.circle",
@@ -86,6 +104,26 @@ struct StatsOverviewView: View {
                 value: stats.totalOutputTokens.formattedCount,
                 label: "Output Tokens",
                 color: .green
+            )
+            StatCard(
+                icon: "book.pages",
+                value: stats.totalCacheReadTokens.formattedCount,
+                label: "Cache Read",
+                color: .teal
+            )
+            if let cache = statsCache {
+                StatCard(
+                    icon: "wrench.and.screwdriver",
+                    value: cache.totalToolCalls.formattedCount,
+                    label: "Tool Calls",
+                    color: .purple
+                )
+            }
+            StatCard(
+                icon: "arrow.triangle.turn.up.right.diamond",
+                value: avgTurnsPerSession,
+                label: "Avg Turns",
+                color: .pink
             )
             StatCard(
                 icon: "calendar",
@@ -129,6 +167,77 @@ struct StatsOverviewView: View {
         }
         .padding(16)
         .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    // MARK: - Daily Model Tokens
+
+    /// Flattened entries for the stacked bar chart.
+    private struct ModelTokenEntry: Identifiable {
+        let id = UUID()
+        let date: Date
+        let model: String
+        let tokens: Int
+    }
+
+    private var dailyModelTokensChart: some View {
+        let entries: [ModelTokenEntry] = {
+            guard let cache = statsCache else { return [] }
+            let df = DateFormatter()
+            df.dateFormat = "yyyy-MM-dd"
+            df.locale = Locale(identifier: "en_US_POSIX")
+            return cache.dailyModelTokens.flatMap { day -> [ModelTokenEntry] in
+                guard let date = df.date(from: day.date) else { return [] }
+                return day.tokensByModel.compactMap { model, tokens in
+                    guard !model.hasPrefix("<") else { return nil }
+                    return ModelTokenEntry(date: date, model: shortModel(model), tokens: tokens)
+                }
+            }
+        }()
+
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("Daily Output Tokens by Model")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+
+            Chart(entries) { entry in
+                BarMark(
+                    x: .value("Date", entry.date, unit: .day),
+                    y: .value("Tokens", entry.tokens)
+                )
+                .foregroundStyle(by: .value("Model", entry.model))
+                .cornerRadius(2)
+            }
+            .chartForegroundStyleScale { (model: String) -> Color in
+                colorForModel(model)
+            }
+            .chartXAxis {
+                AxisMarks(values: .stride(by: .day, count: 7)) { _ in
+                    AxisGridLine()
+                    AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+                }
+            }
+            .chartYAxis {
+                AxisMarks(position: .leading) { _ in
+                    AxisGridLine()
+                    AxisValueLabel()
+                }
+            }
+            .chartXScale(range: .plotDimension(padding: 12))
+            .frame(height: 160)
+        }
+        .padding(16)
+        .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func shortModel(_ model: String) -> String {
+        if model.contains("opus-4-6") { return "Opus 4.6" }
+        if model.contains("opus-4-5") { return "Opus 4.5" }
+        if model.contains("sonnet-4-5") { return "Sonnet 4.5" }
+        if model.contains("haiku-4-5") { return "Haiku 4.5" }
+        if model.contains("opus") { return "Opus" }
+        if model.contains("sonnet") { return "Sonnet" }
+        if model.contains("haiku") { return "Haiku" }
+        return model
     }
 
     // MARK: - Active Hours
