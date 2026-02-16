@@ -20,10 +20,7 @@ struct SessionContentBlockView: View {
     // MARK: - Text Block
 
     private func textBlock(_ text: String) -> some View {
-        Text(verbatim: text)
-            .font(.body)
-            .textSelection(.enabled)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        MarkdownTextView(text: text)
     }
 
     // MARK: - Thinking Block
