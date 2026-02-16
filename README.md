@@ -1,26 +1,26 @@
 # PIQ
 
-macOS menubar app that monitors `.claude/` project directories in real time.
+macOS menubar app for browsing [Claude Code](https://docs.anthropic.com/en/docs/claude-code) sessions across all your projects.
 
-Built for developers using [Claude Code](https://docs.anthropic.com/en/docs/claude-code) with the PM workflow — track PRDs, Epics, and Tasks without leaving your editor.
+See every conversation, tool call, and token spent — without leaving your workflow.
 
 ## Features
 
-- **Auto-discovery** — Configure scan roots (e.g. `~/Developer`), PIQ finds all projects with `.claude/` directories
-- **Real-time monitoring** — FSEvents watches for file changes, UI updates within seconds
-- **Status at a glance** — See PRD/Epic/Task counts and status badges per project
-- **Activity feed** — Track status changes across all projects with relative timestamps
-- **Statistics** — Task completion charts, average duration, daily throughput
-- **Consistency checks** — Warns when epic `tasks_done` doesn't match actual task file counts
-- **Git worktree support** — Detects and displays active worktrees per project
-- **Notifications** — macOS notifications for task completions, epic milestones, and new PRDs
-- **Quick actions** — Open files, copy paths, jump to GitHub Issues
+- **Auto-discovery** — Configure scan roots (e.g. `~/Developer`), PIQ finds all Claude Code sessions automatically
+- **Real-time monitoring** — FSEvents watches for new sessions and updates, UI refreshes within seconds
+- **Session browser** — Search and filter sessions by project, model, branch, or prompt content
+- **Conversation detail** — Full conversation view with user prompts, assistant responses, and tool calls
+- **Tool call rendering** — Specialized views for Read, Write, Edit (with LCS diff), Bash, Grep, and Glob tools
+- **Markdown rendering** — Code blocks, tables, inline formatting in assistant responses
+- **Statistics dashboard** — Daily activity charts, model usage breakdown, token costs, and project overview
+- **API cost tracking** — Per-model cost estimates based on input/output/cache token pricing
+- **Agent support** — Nested agent conversations displayed inline within Task tool calls
 
 ## Screenshots
 
 <p align="center">
-  <img src="assets/screenshot-menubar.png" width="280" alt="Menu bar overview">
-  <img src="assets/screenshot-detail.png" width="280" alt="Expanded project detail">
+  <img src="assets/screenshot-menubar.png" width="280" alt="Menu bar session list">
+  <img src="assets/screenshot-detail.png" width="280" alt="Session detail with tool calls">
   <img src="assets/screenshot-stats.png" width="280" alt="Statistics dashboard">
 </p>
 
@@ -32,25 +32,23 @@ Signed with Developer ID and notarized by Apple — opens without Gatekeeper war
 
 ### Requirements
 
-- macOS 15.0 (Sequoia) or later
+- macOS 14.0 (Sonoma) or later
 
 ## How it works
 
-PIQ reads YAML frontmatter from markdown files in `.claude/` directories:
+PIQ parses Claude Code's JSONL session files from `~/.claude/projects/` directories:
 
 ```
-your-project/
-└── .claude/
-    ├── prds/
-    │   └── feature-name.md        # type: prd, status: backlog|in-progress|done
-    └── epics/
-        └── feature-name/
-            ├── epic.md            # type: epic, task_count, tasks_done
-            ├── 001.md             # type: task, status: open|in-progress|done
-            └── 002.md
+~/.claude/projects/
+└── Users-dev-my-project/
+    ├── abc123.jsonl          # session file
+    ├── agent-def456.jsonl    # agent sub-session
+    └── ...
 ```
 
-Configure a scan root in Settings, and PIQ automatically discovers and monitors all projects underneath.
+Each session file contains the full conversation history — user prompts, assistant responses, tool calls, and token usage. PIQ indexes and caches parsed sessions for fast startup.
+
+Configure a scan root in Settings, and PIQ automatically discovers all projects with Claude Code sessions underneath.
 
 ## Build from source
 
@@ -70,9 +68,10 @@ xcodebuild test -project PIQ.xcodeproj -scheme PIQ -destination 'platform=macOS'
 
 - Swift 6 with strict concurrency
 - SwiftUI (`MenuBarExtra` with `.window` style)
-- FSEvents for file watching
-- Custom frontmatter parser (zero dependencies)
-- JSON persistence for config and activity history
+- FSEvents for real-time file watching
+- Custom JSONL parser with persistent index cache
+- Swift Charts for statistics visualization
+- LCS-based diff with character-level change highlighting
 
 ## License
 
