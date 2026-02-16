@@ -201,12 +201,15 @@ struct SessionToolCallView: View {
         return VStack(alignment: .leading, spacing: 0) {
             if !filePath.isEmpty { filePathHeader(filePath) }
 
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
-                    diffLineRow(line)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                        diffLineRow(line)
+                    }
                 }
+                .textSelection(.enabled)
             }
-            .textSelection(.enabled)
+            .frame(maxHeight: 300)
         }
     }
 
@@ -219,12 +222,15 @@ struct SessionToolCallView: View {
         return VStack(alignment: .leading, spacing: 0) {
             if !filePath.isEmpty { filePathHeader(filePath) }
 
-            Text(content.prefix(8000))
-                .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(.primary.opacity(0.85))
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(10)
+            ScrollView {
+                Text(content.prefix(8000))
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.primary.opacity(0.85))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+            }
+            .frame(maxHeight: 300)
         }
     }
 
@@ -268,12 +274,15 @@ struct SessionToolCallView: View {
     }
 
     private func bashOutputView(_ output: String) -> some View {
-        Text(output.prefix(8000))
-            .font(.system(.caption, design: .monospaced))
-            .foregroundStyle(pair.isError ? .red : .secondary)
-            .textSelection(.enabled)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(10)
+        ScrollView {
+            Text(output.prefix(8000))
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(pair.isError ? .red : .secondary)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10)
+        }
+        .frame(maxHeight: 200)
     }
 
     // MARK: - Read Tool
@@ -291,12 +300,15 @@ struct SessionToolCallView: View {
     }
 
     private func readOutputView(_ output: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(output.components(separatedBy: "\n").enumerated()), id: \.offset) { _, rawLine in
-                readLineRow(rawLine)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(output.components(separatedBy: "\n").enumerated()), id: \.offset) { _, rawLine in
+                    readLineRow(rawLine)
+                }
             }
+            .textSelection(.enabled)
         }
-        .textSelection(.enabled)
+        .frame(maxHeight: 300)
     }
 
     private func readLineRow(_ rawLine: String) -> some View {
@@ -387,24 +399,27 @@ struct SessionToolCallView: View {
     /// Shared view for file list / search results output.
     private func searchResultsView(_ output: String) -> some View {
         let lines = output.components(separatedBy: "\n").filter { !$0.isEmpty }
-        return VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(lines.prefix(500).enumerated()), id: \.offset) { _, line in
-                Text(line)
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 1.5)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(lines.prefix(500).enumerated()), id: \.offset) { _, line in
+                    Text(line)
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 1.5)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if lines.count > 500 {
+                    Text("… \(lines.count - 500) more")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                }
             }
-            if lines.count > 500 {
-                Text("… \(lines.count - 500) more")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-            }
+            .textSelection(.enabled)
         }
-        .textSelection(.enabled)
+        .frame(maxHeight: 200)
     }
 
     private func diffLineRow(_ line: DiffDisplayLine) -> some View {
@@ -608,30 +623,36 @@ struct SessionToolCallView: View {
     // MARK: - Raw Input
 
     private var rawInputView: some View {
-        Text(pair.inputJSON)
-            .font(.system(.caption, design: .monospaced))
-            .foregroundStyle(.secondary)
-            .textSelection(.enabled)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(10)
+        ScrollView {
+            Text(pair.inputJSON)
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10)
+        }
+        .frame(maxHeight: 150)
     }
 
     // MARK: - Output Section
 
     private func outputSection(_ output: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(output.prefix(5000))
-                .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(pair.isError ? .red : .secondary)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            if output.count > 5000 {
-                Text("… truncated (\(output.count) chars)")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(output.prefix(5000))
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(pair.isError ? .red : .secondary)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if output.count > 5000 {
+                    Text("… truncated (\(output.count) chars)")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
             }
+            .padding(10)
         }
-        .padding(10)
+        .frame(maxHeight: 200)
     }
 
     // MARK: - Agent Section
