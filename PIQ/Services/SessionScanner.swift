@@ -86,24 +86,4 @@ enum SessionScanner {
             }
             return best
         }.sorted { $0.lastActivityAt > $1.lastActivityAt }
-    }
-
-    /// Incremental dedup: only re-dedup sessions in changed directories,
-    /// keeping unaffected sessions as-is.
-    static func incrementalDedup(
-        allSessions: [SessionEntry],
-        changedDirs: Set<URL>
-    ) -> [SessionEntry] {
-        guard !changedDirs.isEmpty else { return allSessions }
-
-        let affected = allSessions.filter {
-            changedDirs.contains($0.jsonlURL.deletingLastPathComponent())
-        }
-        let unaffected = allSessions.filter {
-            !changedDirs.contains($0.jsonlURL.deletingLastPathComponent())
-        }
-
-        let dedupedAffected = deduplicateSessions(affected)
-        return (unaffected + dedupedAffected).sorted { $0.lastActivityAt > $1.lastActivityAt }
-    }
-}
+    }}

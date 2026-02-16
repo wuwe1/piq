@@ -110,7 +110,6 @@ final class SessionStore {
     private struct ScanResult: Sendable {
         let allEntries: [SessionEntry]
         let updatedIndex: SessionIndex
-        let changedDirs: Set<URL>
         let changedFiles: Set<URL>
         let hasChanges: Bool
     }
@@ -119,14 +118,12 @@ final class SessionStore {
         let file: URL
         let path: String
         let mtime: Date?
-        let projectDir: URL
     }
 
     private struct ParseResult: Sendable {
         let file: URL
         let path: String
         let mtime: Date?
-        let projectDir: URL
         let entry: SessionEntry?
     }
 
@@ -170,10 +167,7 @@ final class SessionStore {
 
             guard result.hasChanges else { return }
 
-            let deduped = SessionScanner.incrementalDedup(
-                allSessions: result.allEntries,
-                changedDirs: result.changedDirs
-            )
+            let deduped = SessionScanner.deduplicateSessions(result.allEntries)
             let newStats = self.loadStats()
             result.updatedIndex.save()
 
@@ -208,7 +202,6 @@ final class SessionStore {
         let projectDirs = SessionScanner.discoverProjects()
         var updatedIndex = index
         var allEntries: [SessionEntry] = []
-        var changedDirs = Set<URL>()
         var changedFiles = Set<URL>()
         var hasChanges = false
         var seenPaths = Set<String>()
@@ -243,7 +236,7 @@ final class SessionStore {
                 }
 
                 // Cache miss — queue for concurrent parse
-                filesToParse.append(FileToParse(file: file, path: path, mtime: newMtime, projectDir: projectDir))
+                filesToParse.append(FileToParse(file: file, path: path, mtime: newMtime))
             }
         }
 
@@ -257,7 +250,7 @@ final class SessionStore {
                 for item in filesToParse {
                     group.addTask {
                         let entry = SessionParser.extractMetadata(from: item.file)
-                        return ParseResult(file: item.file, path: item.path, mtime: item.mtime, projectDir: item.projectDir, entry: entry)
+                        return ParseResult(file: item.file, path: item.path, mtime: item.mtime, entry: entry)
                     }
                 }
 
@@ -272,7 +265,6 @@ final class SessionStore {
                         if let mtime = result.mtime {
                             updatedIndex.update(path: result.path, mtime: mtime, entry: entry)
                         }
-                        changedDirs.insert(result.projectDir)
                         changedFiles.insert(result.file)
                         hasChanges = true
                     } else if result.mtime != nil {
@@ -285,9 +277,6 @@ final class SessionStore {
         // Remove stale entries for files that no longer exist
         let stalePaths = Set(updatedIndex.entries.keys).subtracting(seenPaths)
         if !stalePaths.isEmpty {
-            for path in stalePaths {
-                changedDirs.insert(URL(fileURLWithPath: path).deletingLastPathComponent())
-            }
             updatedIndex.removeStaleEntries(keeping: seenPaths)
             hasChanges = true
         }
@@ -295,7 +284,6 @@ final class SessionStore {
         return ScanResult(
             allEntries: allEntries,
             updatedIndex: updatedIndex,
-            changedDirs: changedDirs,
             changedFiles: changedFiles,
             hasChanges: hasChanges
         )
