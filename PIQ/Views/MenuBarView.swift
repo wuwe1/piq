@@ -164,8 +164,24 @@ struct MenuBarView: View {
     @ViewBuilder
     private var content: some View {
         if sessionStore?.isLoading == true {
-            ProgressView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            VStack(spacing: 8) {
+                if let p = sessionStore?.scanProgress,
+                   let completed = p.completed, let total = p.total, total > 0 {
+                    ProgressView(value: Double(completed), total: Double(total))
+                        .frame(width: 180)
+                    Text(p.message)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ProgressView()
+                    if let p = sessionStore?.scanProgress {
+                        Text(p.message)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if displaySessions.isEmpty {
             VStack(spacing: 12) {
                 Spacer()

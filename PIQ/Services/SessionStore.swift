@@ -38,6 +38,55 @@ struct ClaudeStats: Sendable {
     var totalTokens: Int { totalInputTokens + totalOutputTokens }
 }
 
+// MARK: - SessionIndex (Persistent Cache)
+
+struct SessionIndex: Codable, Sendable {
+    struct CachedEntry: Codable, Sendable {
+        let mtime: Date
+        let entry: SessionEntry
+    }
+    var entries: [String: CachedEntry] = [:]  // key = file path
+
+    private static let indexURL: URL = {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appending(path: ".claude/session-index.json")
+    }()
+
+    static func load() -> SessionIndex {
+        guard let data = try? Data(contentsOf: indexURL),
+              let index = try? JSONDecoder().decode(SessionIndex.self, from: data) else {
+            return SessionIndex()
+        }
+        return index
+    }
+
+    func save() {
+        guard let data = try? JSONEncoder().encode(self) else { return }
+        try? data.write(to: Self.indexURL, options: .atomic)
+    }
+
+    func cachedEntry(for path: String, mtime: Date) -> SessionEntry? {
+        guard let cached = entries[path], cached.mtime == mtime else { return nil }
+        return cached.entry
+    }
+
+    mutating func update(path: String, mtime: Date, entry: SessionEntry) {
+        entries[path] = CachedEntry(mtime: mtime, entry: entry)
+    }
+
+    mutating func removeStaleEntries(keeping validPaths: Set<String>) {
+        entries = entries.filter { validPaths.contains($0.key) }
+    }
+}
+
+// MARK: - ScanProgress
+
+struct ScanProgress: Equatable, Sendable {
+    let message: String
+    let completed: Int?
+    let total: Int?
+}
+
 // MARK: - SessionStore
 
 /// Central state manager for Claude Code sessions.
@@ -46,31 +95,65 @@ struct ClaudeStats: Sendable {
 final class SessionStore {
     private(set) var sessions: [SessionEntry] = []
     private(set) var isLoading = false
+    private(set) var scanProgress: ScanProgress?
     private(set) var stats: ClaudeStats?
     private var fileWatcher: SessionFileWatcher?
-    private var mtimeCache: [URL: Date] = [:]
+    private var sessionIndex = SessionIndex()
 
     /// Currently loaded session detail (turns for the selected session).
     private(set) var loadedTurns: [SessionTurn] = []
     private(set) var loadedSessionId: String?
     private(set) var isLoadingDetail = false
 
+    // MARK: - Scan Types
+
+    private struct ScanResult: Sendable {
+        let allEntries: [SessionEntry]
+        let updatedIndex: SessionIndex
+        let changedDirs: Set<URL>
+        let changedFiles: Set<URL>
+        let hasChanges: Bool
+    }
+
+    private struct FileToParse: Sendable {
+        let file: URL
+        let path: String
+        let mtime: Date?
+        let projectDir: URL
+    }
+
+    private struct ParseResult: Sendable {
+        let file: URL
+        let path: String
+        let mtime: Date?
+        let projectDir: URL
+        let entry: SessionEntry?
+    }
+
     // MARK: - Scanning
 
     /// Full rescan of all session files (runs IO on background thread).
     func rescan() {
         isLoading = true
-        Task.detached(priority: .userInitiated) {
-            let scanned = SessionScanner.scanAll()
-            var cache: [URL: Date] = [:]
-            for entry in scanned {
-                cache[entry.jsonlURL] = SessionScanner.modificationDate(of: entry.jsonlURL)
+        scanProgress = nil
+        var index = sessionIndex
+        if index.entries.isEmpty {
+            index = SessionIndex.load()
+        }
+        Task.detached(priority: .userInitiated) { [index] in
+            let result = await Self.scanWithIndex(index) { progress in
+                await MainActor.run {
+                    self.scanProgress = progress
+                }
             }
+            let deduped = SessionScanner.deduplicateSessions(result.allEntries)
             let newStats = self.loadStats()
-            await MainActor.run { [scanned, cache, newStats] in
-                self.sessions = scanned
-                self.mtimeCache = cache
+            result.updatedIndex.save()
+            await MainActor.run {
+                self.sessions = deduped
+                self.sessionIndex = result.updatedIndex
                 self.stats = newStats
+                self.scanProgress = nil
                 self.isLoading = false
             }
         }
@@ -79,23 +162,20 @@ final class SessionStore {
     /// Incremental update: only re-parse files whose mtime changed.
     /// All file I/O runs on a background thread; only final state assignment is on MainActor.
     func incrementalUpdate() {
-        let currentSessions = sessions
-        let currentCache = mtimeCache
+        let index = sessionIndex
         let loadedId = loadedSessionId
 
-        Task.detached(priority: .userInitiated) {
-            let result = Self.performIncrementalScan(
-                currentSessions: currentSessions,
-                mtimeCache: currentCache
-            )
+        Task.detached(priority: .userInitiated) { [index] in
+            let result = await Self.scanWithIndex(index)
 
             guard result.hasChanges else { return }
 
             let deduped = SessionScanner.incrementalDedup(
-                allSessions: result.updatedSessions,
+                allSessions: result.allEntries,
                 changedDirs: result.changedDirs
             )
             let newStats = self.loadStats()
+            result.updatedIndex.save()
 
             // Check if loaded session needs detail refresh
             var detailEntry: SessionEntry?
@@ -107,7 +187,7 @@ final class SessionStore {
 
             await MainActor.run {
                 self.sessions = deduped
-                self.mtimeCache = result.newCache
+                self.sessionIndex = result.updatedIndex
                 self.stats = newStats
 
                 if let entry = detailEntry {
@@ -119,27 +199,22 @@ final class SessionStore {
         }
     }
 
-    // MARK: - Incremental Scan (background)
+    // MARK: - Unified Scan Logic
 
-    private struct IncrementalResult: Sendable {
-        let updatedSessions: [SessionEntry]
-        let newCache: [URL: Date]
-        let changedDirs: Set<URL>
-        let changedFiles: Set<URL>
-        let hasChanges: Bool
-    }
-
-    private nonisolated static func performIncrementalScan(
-        currentSessions: [SessionEntry],
-        mtimeCache: [URL: Date]
-    ) -> IncrementalResult {
+    private nonisolated static func scanWithIndex(
+        _ index: SessionIndex,
+        onProgress: (@Sendable (ScanProgress) async -> Void)? = nil
+    ) async -> ScanResult {
         let projectDirs = SessionScanner.discoverProjects()
-        var sessions = currentSessions
-        var cache = mtimeCache
+        var updatedIndex = index
+        var allEntries: [SessionEntry] = []
         var changedDirs = Set<URL>()
         var changedFiles = Set<URL>()
-        var updated = false
-        var seenFiles = Set<URL>()
+        var hasChanges = false
+        var seenPaths = Set<String>()
+        var filesToParse: [FileToParse] = []
+
+        await onProgress?(ScanProgress(message: "Discovering sessions...", completed: nil, total: nil))
 
         for projectDir in projectDirs {
             let fm = FileManager.default
@@ -154,43 +229,75 @@ final class SessionStore {
             }
 
             for file in jsonlFiles {
-                seenFiles.insert(file)
+                let path = file.path(percentEncoded: false)
+                seenPaths.insert(path)
+
                 let newMtime = try? file.resourceValues(
                     forKeys: [.contentModificationDateKey]
                 ).contentModificationDate
-                let oldMtime = cache[file]
 
-                if oldMtime == nil || newMtime != oldMtime {
-                    if let entry = SessionParser.extractMetadata(from: file) {
-                        sessions.removeAll { $0.jsonlURL == file }
-                        sessions.append(entry)
-                        changedDirs.insert(projectDir)
-                        changedFiles.insert(file)
-                        updated = true
+                // Try cache first
+                if let mtime = newMtime, let cached = updatedIndex.cachedEntry(for: path, mtime: mtime) {
+                    allEntries.append(cached)
+                    continue
+                }
+
+                // Cache miss — queue for concurrent parse
+                filesToParse.append(FileToParse(file: file, path: path, mtime: newMtime, projectDir: projectDir))
+            }
+        }
+
+        // Parse cache-miss files concurrently
+        if !filesToParse.isEmpty {
+            let total = filesToParse.count
+            await onProgress?(ScanProgress(message: "Parsing sessions 0/\(total)...", completed: 0, total: total))
+
+            var parsed = 0
+            await withTaskGroup(of: ParseResult.self) { group in
+                for item in filesToParse {
+                    group.addTask {
+                        let entry = SessionParser.extractMetadata(from: item.file)
+                        return ParseResult(file: item.file, path: item.path, mtime: item.mtime, projectDir: item.projectDir, entry: entry)
                     }
-                    cache[file] = newMtime
+                }
+
+                for await result in group {
+                    parsed += 1
+                    if parsed == 1 || parsed % 5 == 0 || parsed == total {
+                        await onProgress?(ScanProgress(message: "Parsing sessions \(parsed)/\(total)...", completed: parsed, total: total))
+                    }
+
+                    if let entry = result.entry {
+                        allEntries.append(entry)
+                        if let mtime = result.mtime {
+                            updatedIndex.update(path: result.path, mtime: mtime, entry: entry)
+                        }
+                        changedDirs.insert(result.projectDir)
+                        changedFiles.insert(result.file)
+                        hasChanges = true
+                    } else if result.mtime != nil {
+                        updatedIndex.entries.removeValue(forKey: result.path)
+                    }
                 }
             }
         }
 
-        // Remove sessions whose files no longer exist
-        let staleFiles = Set(cache.keys).subtracting(seenFiles)
-        if !staleFiles.isEmpty {
-            for file in staleFiles {
-                changedDirs.insert(file.deletingLastPathComponent())
-                cache.removeValue(forKey: file)
+        // Remove stale entries for files that no longer exist
+        let stalePaths = Set(updatedIndex.entries.keys).subtracting(seenPaths)
+        if !stalePaths.isEmpty {
+            for path in stalePaths {
+                changedDirs.insert(URL(fileURLWithPath: path).deletingLastPathComponent())
             }
-            let beforeCount = sessions.count
-            sessions.removeAll { staleFiles.contains($0.jsonlURL) }
-            if sessions.count != beforeCount { updated = true }
+            updatedIndex.removeStaleEntries(keeping: seenPaths)
+            hasChanges = true
         }
 
-        return IncrementalResult(
-            updatedSessions: sessions,
-            newCache: cache,
+        return ScanResult(
+            allEntries: allEntries,
+            updatedIndex: updatedIndex,
             changedDirs: changedDirs,
             changedFiles: changedFiles,
-            hasChanges: updated
+            hasChanges: hasChanges
         )
     }
 

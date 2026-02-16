@@ -5,40 +5,21 @@ import Foundation
 /// Parses Claude Code JSONL session files.
 enum SessionParser {
 
-    // MARK: - Metadata Extraction (Head + Tail only)
+    // MARK: - Metadata Extraction (Full Scan)
 
-    /// Read head 32KB + tail 32KB to extract list-level metadata.
+    /// Read entire JSONL file to extract accurate metadata.
     static func extractMetadata(from url: URL) -> SessionEntry? {
-        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
-        defer { try? handle.close() }
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        let allLines = linesFromData(data)
 
-        let headSize = 32 * 1024
-        let headData = handle.readData(ofLength: headSize)
-        let headLines = linesFromData(headData)
-
-        // Also read tail
-        let fileSize = (try? handle.seekToEnd()) ?? 0
-        var tailLines: [Data] = []
-        if fileSize > headSize {
-            let tailStart = max(0, fileSize - UInt64(headSize))
-            handle.seek(toFileOffset: tailStart)
-            let tailData = handle.readData(ofLength: headSize)
-            tailLines = linesFromData(tailData)
-            // If we started mid-line, drop the first partial line
-            if tailStart > 0 && !tailLines.isEmpty {
-                tailLines.removeFirst()
-            }
-        }
-
-        // Parse head lines for first message metadata
         var sessionId: String?
         var cwd: String?
         var gitBranch: String = ""
         var slug: String = ""
         var model: String = ""
-        var version: String?
         var firstPrompt: String = ""
         var createdAt: Date?
+        var lastActivityAt: Date?
         var hasSubagents = false
 
         var userCount = 0
@@ -47,7 +28,7 @@ enum SessionParser {
         var inputTokens = 0
         var outputTokens = 0
 
-        for lineData in headLines {
+        for lineData in allLines {
             guard let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any] else { continue }
 
             let lineType = json["type"] as? String ?? ""
@@ -67,9 +48,6 @@ enum SessionParser {
             if slug.isEmpty, let s = json["slug"] as? String, !s.isEmpty {
                 slug = s
             }
-            if version == nil, let v = json["version"] as? String, !v.isEmpty {
-                version = v
-            }
 
             // Use timestamp of the first real message as creation time
             if createdAt == nil, (lineType == "user" || lineType == "assistant"),
@@ -77,9 +55,13 @@ enum SessionParser {
                 createdAt = parseISO8601(ts)
             }
 
+            // Track last activity from any line with a timestamp
+            if let ts = json["timestamp"] as? String, let date = parseISO8601(ts) {
+                lastActivityAt = date
+            }
+
             if lineType == "user" {
                 userCount += 1
-                // Count real user turns (with text content, not tool_result-only)
                 if let msg = json["message"] as? [String: Any] {
                     if isRealUserMessage(msg) {
                         userTurnCount += 1
@@ -88,7 +70,6 @@ enum SessionParser {
             }
             if lineType == "assistant" {
                 assistantCount += 1
-                // Extract token usage
                 if let msg = json["message"] as? [String: Any],
                    let usage = msg["usage"] as? [String: Any] {
                     inputTokens += usage["input_tokens"] as? Int ?? 0
@@ -114,59 +95,6 @@ enum SessionParser {
 
             if let sidechain = json["isSidechain"] as? Bool, sidechain {
                 hasSubagents = true
-            }
-        }
-
-        // Parse tail for last activity and additional counts.
-        // Use seen UUIDs to avoid double-counting when head and tail overlap.
-        var seenUUIDs = Set<String>()
-        for lineData in headLines {
-            if let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
-               let uuid = json["uuid"] as? String {
-                seenUUIDs.insert(uuid)
-            }
-        }
-
-        var lastActivityAt: Date?
-        for lineData in tailLines.reversed() {
-            guard let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any] else { continue }
-
-            let lineType = json["type"] as? String ?? ""
-            let uuid = json["uuid"] as? String
-
-            // Only count messages not already seen in the head
-            if let uuid, !seenUUIDs.contains(uuid) {
-                if lineType == "user" {
-                    userCount += 1
-                    if let msg = json["message"] as? [String: Any], isRealUserMessage(msg) {
-                        userTurnCount += 1
-                    }
-                }
-                if lineType == "assistant" {
-                    assistantCount += 1
-                    if let msg = json["message"] as? [String: Any],
-                       let usage = msg["usage"] as? [String: Any] {
-                        inputTokens += usage["input_tokens"] as? Int ?? 0
-                        outputTokens += usage["output_tokens"] as? Int ?? 0
-                    }
-                }
-            }
-
-            // Update metadata from tail if not found in head
-            if slug.isEmpty, let s = json["slug"] as? String {
-                slug = s
-            }
-            if model.isEmpty, lineType == "assistant",
-               let msg = json["message"] as? [String: Any],
-               let m = msg["model"] as? String {
-                model = m
-            }
-            if let sidechain = json["isSidechain"] as? Bool, sidechain {
-                hasSubagents = true
-            }
-
-            if lastActivityAt == nil, let ts = json["timestamp"] as? String {
-                lastActivityAt = parseISO8601(ts)
             }
         }
 

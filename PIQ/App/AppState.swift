@@ -9,6 +9,7 @@ final class AppState {
     var pendingSessionId: String?
 
     func setupSessionStore() {
+        guard sessionStore == nil else { return }
         let store = SessionStore()
         store.rescan()
         store.startWatching()

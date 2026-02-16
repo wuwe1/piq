@@ -26,36 +26,6 @@ enum SessionScanner {
         }
     }
 
-    /// Scan a single project directory for .jsonl session files.
-    static func scanSessions(in projectDir: URL) -> [SessionEntry] {
-        let fm = FileManager.default
-        guard let contents = try? fm.contentsOfDirectory(
-            at: projectDir,
-            includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
-            options: [.skipsHiddenFiles]
-        ) else { return [] }
-
-        let jsonlFiles = contents.filter {
-            $0.pathExtension == "jsonl" && !$0.lastPathComponent.hasPrefix("agent-")
-        }
-
-        return jsonlFiles.compactMap { url in
-            SessionParser.extractMetadata(from: url)
-        }
-    }
-
-    /// Scan all projects and return sessions sorted by last activity (newest first).
-    /// Deduplicates by resolving session continuation chains.
-    ///
-    /// Claude Code creates continuation files when resuming a session:
-    /// the new file's sessionId references the previous file's UUID, forming a chain.
-    /// We resolve the full chain and keep one entry per logical session.
-    static func scanAll() -> [SessionEntry] {
-        let projects = discoverProjects()
-        let allSessions = projects.flatMap { scanSessions(in: $0) }
-        return deduplicateSessions(allSessions)
-    }
-
     /// Deduplicate sessions by resolving continuation chains.
     ///
     /// Claude Code creates continuation files when resuming a session:
@@ -135,10 +105,5 @@ enum SessionScanner {
 
         let dedupedAffected = deduplicateSessions(affected)
         return (unaffected + dedupedAffected).sorted { $0.lastActivityAt > $1.lastActivityAt }
-    }
-
-    /// Get modification date for a JSONL file.
-    static func modificationDate(of url: URL) -> Date? {
-        try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
     }
 }
