@@ -121,6 +121,15 @@ struct SessionDetailView: View {
             expandState.collapseAll()
             isAllExpanded = false
         }
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) { showInspector.toggle() }
+                } label: {
+                    Image(systemName: "sidebar.trailing")
+                }
+            }
+        }
         .inspector(isPresented: $showInspector) {
             inspectorContent
                 .inspectorColumnWidth(min: 260, ideal: 300, max: 400)
@@ -238,17 +247,6 @@ struct SessionDetailView: View {
             }
             .buttonStyle(.plain)
 
-            // Inspector toggle
-            Button {
-                withAnimation(.easeInOut(duration: 0.15)) { showInspector.toggle() }
-            } label: {
-                Image(systemName: "sidebar.trailing")
-                    .font(.caption)
-                    .foregroundStyle(showInspector ? .white : .secondary)
-                    .padding(5)
-                    .background(showInspector ? AnyShapeStyle(.secondary.opacity(0.6)) : AnyShapeStyle(.quaternary), in: RoundedRectangle(cornerRadius: 4))
-            }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
