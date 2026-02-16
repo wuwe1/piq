@@ -17,6 +17,26 @@ struct ModelStats: Identifiable, Sendable {
     let cacheReadTokens: Int
     let cacheCreationTokens: Int
     var totalTokens: Int { inputTokens + outputTokens }
+
+    /// Estimated API cost in USD based on published per-token pricing.
+    var estimatedCost: Double {
+        let rates = Self.pricingRates(for: model)
+        return Double(inputTokens) * rates.input / 1_000_000
+            + Double(outputTokens) * rates.output / 1_000_000
+            + Double(cacheReadTokens) * rates.cacheRead / 1_000_000
+            + Double(cacheCreationTokens) * rates.cacheWrite / 1_000_000
+    }
+
+    private static func pricingRates(for model: String) -> (input: Double, output: Double, cacheRead: Double, cacheWrite: Double) {
+        if model.contains("opus") {
+            return (15, 75, 1.50, 18.75)
+        } else if model.contains("sonnet") {
+            return (3, 15, 0.30, 3.75)
+        } else if model.contains("haiku") {
+            return (0.80, 4, 0.08, 1.0)
+        }
+        return (15, 75, 1.50, 18.75) // default to opus pricing
+    }
 }
 
 struct ClaudeStats: Sendable {
@@ -377,10 +397,15 @@ final class SessionStore {
             .sorted { $0.date < $1.date }
 
         // Model breakdown
-        var models: [String: (inp: Int, out: Int)] = [:]
+        var models: [String: (inp: Int, out: Int, cacheRead: Int, cacheCreate: Int)] = [:]
         for s in sessions where !s.model.isEmpty {
-            let e = models[s.model] ?? (0, 0)
-            models[s.model] = (inp: e.inp + s.inputTokens, out: e.out + s.outputTokens)
+            let e = models[s.model] ?? (0, 0, 0, 0)
+            models[s.model] = (
+                inp: e.inp + s.inputTokens,
+                out: e.out + s.outputTokens,
+                cacheRead: e.cacheRead + s.cacheReadTokens,
+                cacheCreate: e.cacheCreate + s.cacheCreationTokens
+            )
         }
         let modelBreakdown = models.map {
             ModelStats(
@@ -388,18 +413,21 @@ final class SessionStore {
                 displayName: modelDisplayName($0.key),
                 inputTokens: $0.value.inp,
                 outputTokens: $0.value.out,
-                cacheReadTokens: 0,
-                cacheCreationTokens: 0
+                cacheReadTokens: $0.value.cacheRead,
+                cacheCreationTokens: $0.value.cacheCreate
             )
-        }.sorted { $0.totalTokens > $1.totalTokens }
+        }.sorted { $0.estimatedCost > $1.estimatedCost }
+
+        let totalCacheRead = sessions.reduce(0) { $0 + $1.cacheReadTokens }
+        let totalCacheCreate = sessions.reduce(0) { $0 + $1.cacheCreationTokens }
 
         return ClaudeStats(
             totalSessions: sessions.count,
             totalMessages: totalMessages,
             totalInputTokens: totalInput,
             totalOutputTokens: totalOutput,
-            totalCacheReadTokens: 0,
-            totalCacheCreationTokens: 0,
+            totalCacheReadTokens: totalCacheRead,
+            totalCacheCreationTokens: totalCacheCreate,
             firstSessionDate: firstDate,
             longestSessionMessages: longestMsgs,
             longestSessionDuration: longestDuration,

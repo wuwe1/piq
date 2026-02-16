@@ -29,6 +29,8 @@ enum SessionParser {
         var userTurnCount = 0
         var inputTokens = 0
         var outputTokens = 0
+        var cacheReadTokens = 0
+        var cacheCreationTokens = 0
 
         for lineData in allLines {
             guard let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any] else { continue }
@@ -76,6 +78,8 @@ enum SessionParser {
                    let usage = msg["usage"] as? [String: Any] {
                     inputTokens += usage["input_tokens"] as? Int ?? 0
                     outputTokens += usage["output_tokens"] as? Int ?? 0
+                    cacheReadTokens += usage["cache_read_input_tokens"] as? Int ?? 0
+                    cacheCreationTokens += usage["cache_creation_input_tokens"] as? Int ?? 0
                 }
             }
 
@@ -150,7 +154,9 @@ enum SessionParser {
             jsonlURL: url,
             hasSubagents: hasSubagents,
             inputTokens: inputTokens,
-            outputTokens: outputTokens
+            outputTokens: outputTokens,
+            cacheReadTokens: cacheReadTokens,
+            cacheCreationTokens: cacheCreationTokens
         )
     }
 

@@ -83,7 +83,9 @@ enum SessionScanner {
                     jsonlURL: latest.jsonlURL,
                     hasSubagents: group.contains { $0.hasSubagents },
                     inputTokens: group.reduce(0) { $0 + $1.inputTokens },
-                    outputTokens: group.reduce(0) { $0 + $1.outputTokens }
+                    outputTokens: group.reduce(0) { $0 + $1.outputTokens },
+                    cacheReadTokens: group.reduce(0) { $0 + $1.cacheReadTokens },
+                    cacheCreationTokens: group.reduce(0) { $0 + $1.cacheCreationTokens }
                 )
             }
             return best

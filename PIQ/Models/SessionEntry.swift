@@ -19,6 +19,8 @@ struct SessionEntry: Identifiable, Equatable, Sendable, Codable {
     let hasSubagents: Bool
     let inputTokens: Int        // sum of input_tokens from all assistant messages
     let outputTokens: Int       // sum of output_tokens from all assistant messages
+    let cacheReadTokens: Int    // sum of cache_read_input_tokens
+    let cacheCreationTokens: Int // sum of cache_creation_input_tokens
 }
 
 // MARK: - Shared Formatting

@@ -55,10 +55,8 @@ struct StatsOverviewView: View {
             VStack(spacing: 20) {
                 summaryCards
                 dailyActivityChart
-                HStack(spacing: 16) {
-                    activeHoursChart
-                    modelUsageChart
-                }
+                activeHoursChart
+                modelUsageChart
                 projectsList
             }
             .padding(24)
@@ -169,32 +167,66 @@ struct StatsOverviewView: View {
 
     // MARK: - Model Usage
 
-    private var modelUsageChart: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Model Usage")
-                .font(.headline)
-                .foregroundStyle(.secondary)
+    private var totalEstimatedCost: Double {
+        stats.modelBreakdown.reduce(0) { $0 + $1.estimatedCost }
+    }
 
-            Chart(stats.modelBreakdown) { model in
-                BarMark(
-                    x: .value("Tokens", model.totalTokens),
-                    y: .value("Model", model.displayName)
-                )
-                .foregroundStyle(colorForModel(model.displayName).gradient)
-                .cornerRadius(3)
-                .annotation(position: .trailing, spacing: 4) {
-                    Text(model.totalTokens.formattedCount)
-                        .font(.caption2)
+    private var modelUsageChart: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Model Usage")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text("Est. \(totalEstimatedCost, format: .currency(code: "USD"))")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.orange)
+            }
+
+            // Table header
+            HStack(spacing: 0) {
+                Text("Model")
+                    .frame(width: 80, alignment: .leading)
+                Text("Input")
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                Text("Output")
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                Text("Cache Read")
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                Text("Cache Write")
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                Text("Cost")
+                    .frame(width: 70, alignment: .trailing)
+            }
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
+
+            // Model rows
+            ForEach(stats.modelBreakdown) { model in
+                HStack(spacing: 0) {
+                    Text(model.displayName)
+                        .fontWeight(.medium)
+                        .foregroundStyle(colorForModel(model.displayName))
+                        .frame(width: 80, alignment: .leading)
+                    Text(model.inputTokens.formattedCount)
+                        .foregroundStyle(.cyan)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    Text(model.outputTokens.formattedCount)
+                        .foregroundStyle(.green)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    Text(model.cacheReadTokens.formattedCount)
                         .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    Text(model.cacheCreationTokens.formattedCount)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    Text(model.estimatedCost, format: .currency(code: "USD"))
+                        .foregroundStyle(.orange)
+                        .frame(width: 70, alignment: .trailing)
                 }
+                .font(.caption)
             }
-            .chartXAxis(.hidden)
-            .chartYAxis {
-                AxisMarks { _ in
-                    AxisValueLabel()
-                }
-            }
-            .frame(height: 140)
         }
         .padding(16)
         .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 10))
