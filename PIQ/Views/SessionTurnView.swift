@@ -59,8 +59,10 @@ struct SessionTurnView: View {
                 switch item {
                 case .contentBlock(let block):
                     SessionContentBlockView(block: block)
+                        .padding(.trailing, 16)
                 case .toolCall(let pair):
                     SessionToolCallView(pair: pair)
+                        .padding(.trailing, 16)
                 }
             }
 

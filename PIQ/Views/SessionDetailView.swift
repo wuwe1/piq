@@ -106,7 +106,7 @@ struct SessionDetailView: View {
         }
         .inspector(isPresented: $showInspector) {
             inspectorContent
-                .inspectorColumnWidth(min: 180, ideal: 220, max: 300)
+                .inspectorColumnWidth(min: 260, ideal: 300, max: 400)
         }
     }
 
@@ -338,6 +338,9 @@ struct SessionDetailView: View {
 
     private func inspectorRowMeta(_ turn: SessionTurn) -> some View {
         HStack(spacing: 6) {
+            if let ts = turn.userMessage?.timestamp {
+                Text(ts, format: .dateTime.hour().minute().second())
+            }
             let toolCount = turn.toolPairs.count
             if toolCount > 0 {
                 Label("\(toolCount)", systemImage: "wrench")
