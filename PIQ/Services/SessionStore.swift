@@ -144,7 +144,7 @@ final class SessionStore {
                 }
             }
             let deduped = SessionScanner.deduplicateSessions(result.allEntries)
-            let newStats = self.loadStats()
+            let newStats = Self.computeStats(from: deduped)
             result.updatedIndex.save()
             await MainActor.run {
                 self.sessions = deduped
@@ -168,7 +168,7 @@ final class SessionStore {
             guard result.hasChanges else { return }
 
             let deduped = SessionScanner.deduplicateSessions(result.allEntries)
-            let newStats = self.loadStats()
+            let newStats = Self.computeStats(from: deduped)
             result.updatedIndex.save()
 
             // Check if loaded session needs detail refresh
@@ -341,90 +341,62 @@ final class SessionStore {
 
     // MARK: - Aggregate Stats
 
-    /// Read aggregate stats from ~/.claude/stats-cache.json.
-    nonisolated func loadStats() -> ClaudeStats? {
-        let url = FileManager.default.homeDirectoryForCurrentUser
-            .appending(path: ".claude/stats-cache.json")
-        guard let data = try? Data(contentsOf: url),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return nil
+    /// Compute aggregate stats from parsed session data.
+    private nonisolated static func computeStats(from sessions: [SessionEntry]) -> ClaudeStats {
+        let totalMessages = sessions.reduce(0) { $0 + $1.messageCount }
+        let totalInput = sessions.reduce(0) { $0 + $1.inputTokens }
+        let totalOutput = sessions.reduce(0) { $0 + $1.outputTokens }
+
+        let firstDate = sessions.min(by: { $0.createdAt < $1.createdAt })?.createdAt
+        let longestMsgs = sessions.max(by: { $0.messageCount < $1.messageCount })?.messageCount ?? 0
+        let longestDuration = sessions.reduce(0.0) {
+            max($0, $1.lastActivityAt.timeIntervalSince($1.createdAt))
         }
 
-        let totalSessions = json["totalSessions"] as? Int ?? 0
-        let totalMessages = json["totalMessages"] as? Int ?? 0
-
-        var totalInput = 0
-        var totalOutput = 0
-        var totalCacheRead = 0
-        var totalCacheCreation = 0
-        var modelBreakdown: [ModelStats] = []
-        if let modelUsage = json["modelUsage"] as? [String: [String: Any]] {
-            for (model, usage) in modelUsage {
-                let inp = usage["inputTokens"] as? Int ?? 0
-                let out = usage["outputTokens"] as? Int ?? 0
-                let cacheRead = usage["cacheReadInputTokens"] as? Int ?? 0
-                let cacheCreate = usage["cacheCreationInputTokens"] as? Int ?? 0
-                totalInput += inp
-                totalOutput += out
-                totalCacheRead += cacheRead
-                totalCacheCreation += cacheCreate
-                modelBreakdown.append(ModelStats(
-                    model: model,
-                    displayName: Self.modelDisplayName(model),
-                    inputTokens: inp,
-                    outputTokens: out,
-                    cacheReadTokens: cacheRead,
-                    cacheCreationTokens: cacheCreate
-                ))
-            }
-        }
-        modelBreakdown.sort { $0.totalTokens > $1.totalTokens }
-
-        // firstSessionDate
-        var firstDate: Date?
-        if let dateStr = json["firstSessionDate"] as? String {
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            firstDate = formatter.date(from: dateStr)
-        }
-
-        // longestSession
-        var longestMsgs = 0
-        var longestDuration: TimeInterval = 0
-        if let longest = json["longestSession"] as? [String: Any] {
-            longestMsgs = longest["messageCount"] as? Int ?? 0
-            longestDuration = longest["duration"] as? Double ?? 0
-        }
-
-        // hourCounts
+        // Hour counts — messages in the last 24 hours, by creation hour
+        let calendar = Calendar.current
+        let cutoff = Date().addingTimeInterval(-24 * 3600)
         var hourCounts: [Int: Int] = [:]
-        if let hours = json["hourCounts"] as? [String: Int] {
-            for (key, value) in hours {
-                if let hour = Int(key) {
-                    hourCounts[hour] = value
-                }
-            }
+        for s in sessions where s.lastActivityAt > cutoff {
+            let hour = calendar.component(.hour, from: s.createdAt)
+            hourCounts[hour, default: 0] += s.messageCount
         }
 
-        // dailyActivity
-        var dailyActivity: [DailyActivity] = []
-        if let daily = json["dailyActivity"] as? [[String: Any]] {
-            for entry in daily {
-                if let date = entry["date"] as? String,
-                   let count = entry["messageCount"] as? Int {
-                    dailyActivity.append(DailyActivity(date: date, messageCount: count))
-                }
-            }
+        // Daily activity — messages grouped by session creation date
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        df.locale = Locale(identifier: "en_US_POSIX")
+        var daily: [String: Int] = [:]
+        for s in sessions {
+            daily[df.string(from: s.createdAt), default: 0] += s.messageCount
         }
-        dailyActivity.sort { $0.date < $1.date }
+        let dailyActivity = daily.map { DailyActivity(date: $0.key, messageCount: $0.value) }
+            .sorted { $0.date < $1.date }
+
+        // Model breakdown
+        var models: [String: (inp: Int, out: Int)] = [:]
+        for s in sessions where !s.model.isEmpty {
+            let e = models[s.model] ?? (0, 0)
+            models[s.model] = (inp: e.inp + s.inputTokens, out: e.out + s.outputTokens)
+        }
+        let modelBreakdown = models.map {
+            ModelStats(
+                model: $0.key,
+                displayName: modelDisplayName($0.key),
+                inputTokens: $0.value.inp,
+                outputTokens: $0.value.out,
+                cacheReadTokens: 0,
+                cacheCreationTokens: 0
+            )
+        }.sorted { $0.totalTokens > $1.totalTokens }
 
         return ClaudeStats(
-            totalSessions: totalSessions,
+            totalSessions: sessions.count,
             totalMessages: totalMessages,
             totalInputTokens: totalInput,
             totalOutputTokens: totalOutput,
-            totalCacheReadTokens: totalCacheRead,
-            totalCacheCreationTokens: totalCacheCreation,
+            totalCacheReadTokens: 0,
+            totalCacheCreationTokens: 0,
             firstSessionDate: firstDate,
             longestSessionMessages: longestMsgs,
             longestSessionDuration: longestDuration,
