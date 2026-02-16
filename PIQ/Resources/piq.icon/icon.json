@@ -1,0 +1,33 @@
+{
+  "fill" : {
+    "solid" : "srgb:1.00000,0.83235,0.47321,1.00000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "fill" : {
+            "solid" : "srgb:0.12984,0.12985,0.12984,1.00000"
+          },
+          "glass" : false,
+          "image-name" : "Frame 2.svg",
+          "name" : "Frame 2"
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}
