@@ -173,9 +173,9 @@ struct SessionToolCallView: View {
         let filePath = input["file_path"] as? String ?? ""
         let oldStr = input["old_string"] as? String ?? ""
         let newStr = input["new_string"] as? String ?? ""
+        let lines = Self.computeLineDiff(old: oldStr, new: newStr)
 
         return VStack(alignment: .leading, spacing: 0) {
-            // File path
             if !filePath.isEmpty {
                 Text(filePath)
                     .font(.system(.caption2, design: .monospaced))
@@ -186,45 +186,214 @@ struct SessionToolCallView: View {
                     .background(.quaternary.opacity(0.3))
             }
 
-            // Diff
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    // Removed lines
-                    ForEach(Array(oldStr.components(separatedBy: "\n").enumerated()), id: \.offset) { _, line in
-                        HStack(spacing: 0) {
-                            Text("−")
-                                .frame(width: 16)
-                                .foregroundStyle(.red.opacity(0.6))
-                            Text(line)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(.red)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 1)
-                        .background(.red.opacity(0.08))
-                    }
-
-                    // Added lines
-                    ForEach(Array(newStr.components(separatedBy: "\n").enumerated()), id: \.offset) { _, line in
-                        HStack(spacing: 0) {
-                            Text("+")
-                                .frame(width: 16)
-                                .foregroundStyle(.green.opacity(0.6))
-                            Text(line)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(.green)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 1)
-                        .background(.green.opacity(0.08))
+                    ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                        diffLineRow(line)
                     }
                 }
                 .textSelection(.enabled)
             }
             .frame(maxHeight: 300)
         }
+    }
+
+    private func diffLineRow(_ line: DiffDisplayLine) -> some View {
+        let prefixColor: Color = switch line.type {
+        case .context: .secondary.opacity(0.3)
+        case .removed: .red.opacity(0.6)
+        case .added: .green.opacity(0.6)
+        }
+        let bgColor: Color = switch line.type {
+        case .context: .clear
+        case .removed: .red.opacity(0.08)
+        case .added: .green.opacity(0.08)
+        }
+
+        return HStack(spacing: 0) {
+            Text(line.prefix)
+                .frame(width: 16)
+                .foregroundStyle(prefixColor)
+            Text(line.styledText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .font(.system(.caption, design: .monospaced))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 1)
+        .background(bgColor)
+    }
+
+    // MARK: - Diff Types & Computation
+
+    private enum DiffLineType { case context, removed, added }
+
+    private struct DiffDisplayLine {
+        let prefix: String
+        let type: DiffLineType
+        let styledText: AttributedString
+    }
+
+    private enum LineDiffOp {
+        case equal(String)
+        case remove(String)
+        case insert(String)
+    }
+
+    /// LCS-based line diff with character-level highlights for modified pairs.
+    private static func computeLineDiff(old: String, new: String) -> [DiffDisplayLine] {
+        let oldLines = old.components(separatedBy: "\n")
+        let newLines = new.components(separatedBy: "\n")
+        let ops = lcsLineDiff(oldLines, newLines)
+
+        var result: [DiffDisplayLine] = []
+        var i = 0
+        while i < ops.count {
+            switch ops[i] {
+            case .equal(let text):
+                result.append(DiffDisplayLine(
+                    prefix: " ", type: .context,
+                    styledText: AttributedString(text)
+                ))
+                i += 1
+            default:
+                // Gather consecutive removes/inserts as a hunk
+                var removes: [String] = []
+                var inserts: [String] = []
+                while i < ops.count {
+                    if case .remove(let t) = ops[i] { removes.append(t); i += 1 }
+                    else if case .insert(let t) = ops[i] { inserts.append(t); i += 1 }
+                    else { break }
+                }
+                // Pair up for character-level diff, interleave remove/add
+                let pairs = min(removes.count, inserts.count)
+                for p in 0..<pairs {
+                    let (oldHL, newHL) = charHighlights(old: removes[p], new: inserts[p])
+                    result.append(DiffDisplayLine(
+                        prefix: "−", type: .removed,
+                        styledText: styledDiffText(removes[p], highlights: oldHL, color: .red)
+                    ))
+                    result.append(DiffDisplayLine(
+                        prefix: "+", type: .added,
+                        styledText: styledDiffText(inserts[p], highlights: newHL, color: .green)
+                    ))
+                }
+                for p in pairs..<removes.count {
+                    result.append(DiffDisplayLine(
+                        prefix: "−", type: .removed,
+                        styledText: AttributedString(removes[p])
+                    ))
+                }
+                for p in pairs..<inserts.count {
+                    result.append(DiffDisplayLine(
+                        prefix: "+", type: .added,
+                        styledText: AttributedString(inserts[p])
+                    ))
+                }
+            }
+        }
+        return result
+    }
+
+    /// LCS-based diff producing edit operations.
+    private static func lcsLineDiff(_ old: [String], _ new: [String]) -> [LineDiffOp] {
+        let m = old.count, n = new.count
+        if m == 0 { return new.map { .insert($0) } }
+        if n == 0 { return old.map { .remove($0) } }
+
+        var dp = Array(repeating: Array(repeating: 0, count: n + 1), count: m + 1)
+        for i in 1...m {
+            for j in 1...n {
+                if old[i - 1] == new[j - 1] {
+                    dp[i][j] = dp[i - 1][j - 1] + 1
+                } else {
+                    dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+                }
+            }
+        }
+
+        var ops: [LineDiffOp] = []
+        var i = m, j = n
+        while i > 0 || j > 0 {
+            if i > 0 && j > 0 && old[i - 1] == new[j - 1] {
+                ops.append(.equal(old[i - 1]))
+                i -= 1; j -= 1
+            } else if j > 0 && (i == 0 || dp[i][j - 1] >= dp[i - 1][j]) {
+                ops.append(.insert(new[j - 1]))
+                j -= 1
+            } else {
+                ops.append(.remove(old[i - 1]))
+                i -= 1
+            }
+        }
+        return ops.reversed()
+    }
+
+    /// Character-level LCS to find which chars changed between two lines.
+    private static func charHighlights(old: String, new: String) -> (IndexSet, IndexSet) {
+        let oldChars = Array(old)
+        let newChars = Array(new)
+        let m = oldChars.count, n = newChars.count
+
+        // Skip for very long lines
+        if m > 500 || n > 500 { return (IndexSet(), IndexSet()) }
+        if m == 0 { return (IndexSet(), n > 0 ? IndexSet(integersIn: 0..<n) : IndexSet()) }
+        if n == 0 { return (m > 0 ? IndexSet(integersIn: 0..<m) : IndexSet(), IndexSet()) }
+
+        var dp = Array(repeating: Array(repeating: 0, count: n + 1), count: m + 1)
+        for i in 1...m {
+            for j in 1...n {
+                if oldChars[i - 1] == newChars[j - 1] {
+                    dp[i][j] = dp[i - 1][j - 1] + 1
+                } else {
+                    dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+                }
+            }
+        }
+
+        // Backtrack to find common characters
+        var commonOld = Set<Int>()
+        var commonNew = Set<Int>()
+        var i = m, j = n
+        while i > 0 && j > 0 {
+            if oldChars[i - 1] == newChars[j - 1] {
+                commonOld.insert(i - 1)
+                commonNew.insert(j - 1)
+                i -= 1; j -= 1
+            } else if dp[i][j - 1] >= dp[i - 1][j] {
+                j -= 1
+            } else {
+                i -= 1
+            }
+        }
+
+        // Highlights = characters NOT in common
+        var oldHL = IndexSet()
+        for idx in 0..<m where !commonOld.contains(idx) { oldHL.insert(idx) }
+        var newHL = IndexSet()
+        for idx in 0..<n where !commonNew.contains(idx) { newHL.insert(idx) }
+        return (oldHL, newHL)
+    }
+
+    /// Build AttributedString with highlighted character ranges.
+    private static func styledDiffText(_ text: String, highlights: IndexSet, color: Color) -> AttributedString {
+        if highlights.isEmpty { return AttributedString(text) }
+
+        var result = AttributedString()
+        let chars = Array(text)
+        var i = 0
+        while i < chars.count {
+            let isHL = highlights.contains(i)
+            var j = i + 1
+            while j < chars.count && highlights.contains(j) == isHL { j += 1 }
+
+            var segment = AttributedString(String(chars[i..<j]))
+            if isHL {
+                segment.backgroundColor = color.opacity(0.25)
+            }
+            result.append(segment)
+            i = j
+        }
+        return result
     }
 
     // MARK: - Raw Input
