@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/icon.png" width="128" alt="PIQ icon">
+</p>
+
 # PIQ
 
 macOS menubar app for browsing [Claude Code](https://docs.anthropic.com/en/docs/claude-code) sessions across all your projects.
