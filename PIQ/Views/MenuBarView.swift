@@ -212,7 +212,7 @@ struct MenuBarView: View {
         Button {
             appState.pendingSessionId = session.id
             NSApp.activate(ignoringOtherApps: true)
-            openWindow(id: "sessions")
+            openWindow(id: "main")
         } label: {
             SessionRowView(entry: session)
                 .padding(.horizontal, 12)
@@ -244,7 +244,7 @@ struct MenuBarView: View {
 
             Button {
                 NSApp.activate(ignoringOtherApps: true)
-                openWindow(id: "sessions")
+                openWindow(id: "main")
             } label: {
                 Image(systemName: "arrow.up.left.and.arrow.down.right")
                     .font(.caption2)

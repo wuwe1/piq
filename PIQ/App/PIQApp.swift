@@ -5,20 +5,20 @@ struct PIQApp: App {
     @State private var appState = AppState()
 
     var body: some Scene {
-        MenuBarExtra("PIQ", systemImage: "eyes") {
-            MenuBarView()
+        Window("PIQ", id: "main") {
+            SessionWindowView()
                 .environment(appState)
-                .frame(width: 360, height: 500)
                 .task {
                     appState.setupSessionStore()
                 }
         }
-        .menuBarExtraStyle(.window)
+        .defaultSize(width: 1000, height: 700)
 
-        Window("Claude Sessions", id: "sessions") {
-            SessionWindowView()
+        MenuBarExtra("PIQ", systemImage: "eyes") {
+            MenuBarView()
                 .environment(appState)
+                .frame(width: 360, height: 500)
         }
-        .defaultSize(width: 900, height: 640)
+        .menuBarExtraStyle(.window)
     }
 }
