@@ -8,6 +8,10 @@ struct StatsOverviewView: View {
     let projectGroups: [(name: String, path: String, count: Int, tokens: Int)]
     let recentHourly: [(date: Date, count: Int)]
 
+    @State private var selectedDay: Date?
+    @State private var selectedModelDay: Date?
+    @State private var selectedHour: Date?
+
     init(stats: ClaudeStats, sessions: [SessionEntry], statsCache: StatsCache? = nil) {
         self.stats = stats
         self.sessions = sessions
@@ -142,14 +146,25 @@ struct StatsOverviewView: View {
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
-            Chart(stats.dailyActivity) { day in
-                BarMark(
-                    x: .value("Date", parseDate(day.date) ?? Date()),
-                    y: .value("Messages", day.messageCount)
-                )
-                .foregroundStyle(.blue.gradient)
-                .cornerRadius(2)
+            Chart {
+                ForEach(stats.dailyActivity) { day in
+                    BarMark(
+                        x: .value("Date", parseDate(day.date) ?? Date(), unit: .day),
+                        y: .value("Messages", day.messageCount)
+                    )
+                    .foregroundStyle(.blue.gradient)
+                    .cornerRadius(2)
+                }
+
+                if let selectedDay, let match = matchingDailyActivity(for: selectedDay) {
+                    RuleMark(x: .value("Selected", parseDate(match.date) ?? selectedDay, unit: .day))
+                        .foregroundStyle(.secondary.opacity(0.3))
+                        .annotation(position: .top, spacing: 4, overflowResolution: .init(x: .fit, y: .disabled)) {
+                            chartTooltip(title: formatShortDate(match.date), value: "\(match.messageCount) msgs")
+                        }
+                }
             }
+            .chartXSelection(value: $selectedDay)
             .chartXAxis {
                 AxisMarks(values: .stride(by: .day, count: 7)) { _ in
                     AxisGridLine()
@@ -199,14 +214,25 @@ struct StatsOverviewView: View {
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
-            Chart(entries) { entry in
-                BarMark(
-                    x: .value("Date", entry.date, unit: .day),
-                    y: .value("Tokens", entry.tokens)
-                )
-                .foregroundStyle(by: .value("Model", entry.model))
-                .cornerRadius(2)
+            Chart {
+                ForEach(entries) { entry in
+                    BarMark(
+                        x: .value("Date", entry.date, unit: .day),
+                        y: .value("Tokens", entry.tokens)
+                    )
+                    .foregroundStyle(by: .value("Model", entry.model))
+                    .cornerRadius(2)
+                }
+
+                if let info = modelTokensTooltipInfo(entries: entries) {
+                    RuleMark(x: .value("Selected", info.date, unit: .day))
+                        .foregroundStyle(.secondary.opacity(0.3))
+                        .annotation(position: .top, spacing: 4, overflowResolution: .init(x: .fit, y: .disabled)) {
+                            chartTooltip(title: formatDate(info.date), value: "\(info.total.formattedCount) tokens")
+                        }
+                }
             }
+            .chartXSelection(value: $selectedModelDay)
             .chartForegroundStyleScale { (model: String) -> Color in
                 colorForModel(model)
             }
@@ -248,14 +274,25 @@ struct StatsOverviewView: View {
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
-            Chart(recentHourly, id: \.date) { item in
-                BarMark(
-                    x: .value("Time", item.date),
-                    y: .value("Messages", item.count)
-                )
-                .foregroundStyle(.purple.gradient)
-                .cornerRadius(2)
+            Chart {
+                ForEach(recentHourly, id: \.date) { item in
+                    BarMark(
+                        x: .value("Time", item.date, unit: .hour),
+                        y: .value("Messages", item.count)
+                    )
+                    .foregroundStyle(.purple.gradient)
+                    .cornerRadius(2)
+                }
+
+                if let selectedHour, let match = matchingHourly(for: selectedHour) {
+                    RuleMark(x: .value("Selected", match.date, unit: .hour))
+                        .foregroundStyle(.secondary.opacity(0.3))
+                        .annotation(position: .top, spacing: 4, overflowResolution: .init(x: .fit, y: .disabled)) {
+                            chartTooltip(title: formatHour(match.date), value: "\(match.count) msgs")
+                        }
+                }
             }
+            .chartXSelection(value: $selectedHour)
             .chartXAxis {
                 AxisMarks(values: .stride(by: .hour, count: 6)) { _ in
                     AxisGridLine()
@@ -381,6 +418,60 @@ struct StatsOverviewView: View {
     }
 
     // MARK: - Helpers
+
+    private func chartTooltip(title: String, value: String) -> some View {
+        VStack(spacing: 2) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.caption)
+                .fontWeight(.semibold)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
+    }
+
+    private func formatShortDate(_ dateStr: String) -> String {
+        guard let date = parseDate(dateStr) else { return dateStr }
+        let df = DateFormatter()
+        df.dateFormat = "M/d"
+        return df.string(from: date)
+    }
+
+    private func formatDate(_ date: Date) -> String {
+        let df = DateFormatter()
+        df.dateFormat = "M/d"
+        return df.string(from: date)
+    }
+
+    private func formatHour(_ date: Date) -> String {
+        let df = DateFormatter()
+        df.dateFormat = "HH:mm"
+        return df.string(from: date)
+    }
+
+    private func matchingDailyActivity(for date: Date) -> DailyActivity? {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        df.locale = Locale(identifier: "en_US_POSIX")
+        let key = df.string(from: date)
+        return stats.dailyActivity.first { $0.date == key }
+    }
+
+    private func modelTokensTooltipInfo(entries: [ModelTokenEntry]) -> (date: Date, total: Int)? {
+        guard let selected = selectedModelDay else { return nil }
+        let cal = Calendar.current
+        let total = entries.filter { cal.isDate($0.date, inSameDayAs: selected) }.reduce(0) { $0 + $1.tokens }
+        guard total > 0 else { return nil }
+        return (date: cal.startOfDay(for: selected), total: total)
+    }
+
+    private func matchingHourly(for date: Date) -> (date: Date, count: Int)? {
+        guard let hour = Calendar.current.dateInterval(of: .hour, for: date)?.start else { return nil }
+        return recentHourly.first { $0.date == hour }
+    }
 
     private func parseDate(_ string: String) -> Date? {
         let formatter = DateFormatter()

@@ -30,6 +30,10 @@ xcuserdata/
 *.xcodeproj/xcuserdata/
 *.xcodeproj/project.xcworkspace/xcuserdata/
 
+# Profiling
+*.profraw
+
 # CCPM
 .claude/epics/*/updates/
 .claude/settings.local.json
+.claude/skills/
