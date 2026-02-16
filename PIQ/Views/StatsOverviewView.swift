@@ -4,6 +4,27 @@ import Charts
 struct StatsOverviewView: View {
     let stats: ClaudeStats
     let sessions: [SessionEntry]
+    let projectGroups: [(name: String, path: String, count: Int, tokens: Int)]
+
+    init(stats: ClaudeStats, sessions: [SessionEntry]) {
+        self.stats = stats
+        self.sessions = sessions
+
+        var groups: [String: (name: String, count: Int, tokens: Int)] = [:]
+        for session in sessions {
+            let key = session.projectPath.isEmpty ? "(unknown)" : session.projectPath
+            let name = session.projectPath.isEmpty ? "Unknown" : session.projectName
+            let existing = groups[key] ?? (name: name, count: 0, tokens: 0)
+            groups[key] = (
+                name: existing.name,
+                count: existing.count + 1,
+                tokens: existing.tokens + session.inputTokens + session.outputTokens
+            )
+        }
+        self.projectGroups = groups.map {
+            (name: $0.value.name, path: $0.key, count: $0.value.count, tokens: $0.value.tokens)
+        }.sorted { $0.count > $1.count }
+    }
 
     private var daysSinceFirst: Int {
         guard let first = stats.firstSessionDate else { return 0 }
@@ -39,13 +60,13 @@ struct StatsOverviewView: View {
             )
             StatCard(
                 icon: "arrow.down.circle",
-                value: formatCount(stats.totalInputTokens),
+                value: stats.totalInputTokens.formattedCount,
                 label: "Input Tokens",
                 color: .cyan
             )
             StatCard(
                 icon: "arrow.up.circle",
-                value: formatCount(stats.totalOutputTokens),
+                value: stats.totalOutputTokens.formattedCount,
                 label: "Output Tokens",
                 color: .green
             )
@@ -146,7 +167,7 @@ struct StatsOverviewView: View {
                 .foregroundStyle(colorForModel(model.displayName).gradient)
                 .cornerRadius(3)
                 .annotation(position: .trailing, spacing: 4) {
-                    Text(formatCount(model.totalTokens))
+                    Text(model.totalTokens.formattedCount)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -164,22 +185,6 @@ struct StatsOverviewView: View {
     }
 
     // MARK: - Projects
-
-    private var projectGroups: [(name: String, path: String, count: Int, tokens: Int)] {
-        var groups: [String: (name: String, count: Int, tokens: Int)] = [:]
-        for session in sessions {
-            let key = session.projectPath.isEmpty ? "(unknown)" : session.projectPath
-            let name = session.projectPath.isEmpty ? "Unknown" : session.projectName
-            let existing = groups[key] ?? (name: name, count: 0, tokens: 0)
-            groups[key] = (
-                name: existing.name,
-                count: existing.count + 1,
-                tokens: existing.tokens + session.inputTokens + session.outputTokens
-            )
-        }
-        return groups.map { (name: $0.value.name, path: $0.key, count: $0.value.count, tokens: $0.value.tokens) }
-            .sorted { $0.count > $1.count }
-    }
 
     private var projectsList: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -200,7 +205,7 @@ struct StatsOverviewView: View {
                         Text("\(project.count) sessions")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Text(formatCount(project.tokens) + " tokens")
+                        Text(project.tokens.formattedCount + " tokens")
                             .font(.caption)
                             .foregroundStyle(.tertiary)
                             .frame(width: 80, alignment: .trailing)
@@ -219,17 +224,6 @@ struct StatsOverviewView: View {
     }
 
     // MARK: - Helpers
-
-    private func formatCount(_ count: Int) -> String {
-        if count >= 1_000_000_000 {
-            return String(format: "%.1fB", Double(count) / 1_000_000_000)
-        } else if count >= 1_000_000 {
-            return String(format: "%.1fM", Double(count) / 1_000_000)
-        } else if count >= 1_000 {
-            return String(format: "%.1fK", Double(count) / 1_000)
-        }
-        return "\(count)"
-    }
 
     private func parseDate(_ string: String) -> Date? {
         let formatter = DateFormatter()

@@ -4,6 +4,12 @@ import SwiftUI
 struct SessionRowView: View {
     let entry: SessionEntry
 
+    private static let relativeFormatter: RelativeDateTimeFormatter = {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .abbreviated
+        return f
+    }()
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             // Top line: project name + time
@@ -13,7 +19,7 @@ struct SessionRowView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 Spacer()
-                Text(relativeTime(entry.lastActivityAt))
+                Text(Self.relativeFormatter.localizedString(for: entry.lastActivityAt, relativeTo: Date()))
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
@@ -27,7 +33,7 @@ struct SessionRowView: View {
             // Bottom line: metadata badges
             HStack(spacing: 6) {
                 if !entry.model.isEmpty {
-                    metaBadge(text: shortModelName(entry.model), color: .purple)
+                    metaBadge(text: entry.model.shortModelName, color: .purple)
                 }
                 if !entry.gitBranch.isEmpty {
                     metaBadge(
@@ -45,7 +51,7 @@ struct SessionRowView: View {
                 }
                 if entry.outputTokens > 0 {
                     metaBadge(
-                        text: formatTokens(entry.inputTokens + entry.outputTokens),
+                        text: (entry.inputTokens + entry.outputTokens).formattedCount,
                         icon: "sparkle",
                         color: .green
                     )
@@ -73,27 +79,5 @@ struct SessionRowView: View {
         .font(.caption2)
         .foregroundStyle(color)
         .lineLimit(1)
-    }
-
-    private func shortModelName(_ model: String) -> String {
-        if model.contains("opus") { return "Opus" }
-        if model.contains("sonnet") { return "Sonnet" }
-        if model.contains("haiku") { return "Haiku" }
-        return model
-    }
-
-    private func formatTokens(_ count: Int) -> String {
-        if count >= 1_000_000 {
-            return String(format: "%.1fM", Double(count) / 1_000_000)
-        } else if count >= 1_000 {
-            return String(format: "%.1fK", Double(count) / 1_000)
-        }
-        return "\(count)"
-    }
-
-    private func relativeTime(_ date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
     }
 }

@@ -46,6 +46,7 @@ struct ClaudeStats: Sendable {
 final class SessionStore {
     private(set) var sessions: [SessionEntry] = []
     private(set) var isLoading = false
+    private(set) var stats: ClaudeStats?
     private var fileWatcher: SessionFileWatcher?
     private var mtimeCache: [URL: Date] = [:]
 
@@ -65,18 +66,80 @@ final class SessionStore {
             for entry in scanned {
                 cache[entry.jsonlURL] = SessionScanner.modificationDate(of: entry.jsonlURL)
             }
-            await MainActor.run { [scanned, cache] in
+            let newStats = self.loadStats()
+            await MainActor.run { [scanned, cache, newStats] in
                 self.sessions = scanned
                 self.mtimeCache = cache
+                self.stats = newStats
                 self.isLoading = false
             }
         }
     }
 
     /// Incremental update: only re-parse files whose mtime changed.
+    /// All file I/O runs on a background thread; only final state assignment is on MainActor.
     func incrementalUpdate() {
+        let currentSessions = sessions
+        let currentCache = mtimeCache
+        let loadedId = loadedSessionId
+
+        Task.detached(priority: .userInitiated) {
+            let result = Self.performIncrementalScan(
+                currentSessions: currentSessions,
+                mtimeCache: currentCache
+            )
+
+            guard result.hasChanges else { return }
+
+            let deduped = SessionScanner.incrementalDedup(
+                allSessions: result.updatedSessions,
+                changedDirs: result.changedDirs
+            )
+            let newStats = self.loadStats()
+
+            // Check if loaded session needs detail refresh
+            var detailEntry: SessionEntry?
+            if let loadedId,
+               let entry = deduped.first(where: { $0.id == loadedId }),
+               result.changedFiles.contains(entry.jsonlURL) {
+                detailEntry = entry
+            }
+
+            await MainActor.run {
+                self.sessions = deduped
+                self.mtimeCache = result.newCache
+                self.stats = newStats
+
+                if let entry = detailEntry {
+                    Task {
+                        await self.loadSessionDetail(entry: entry)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Incremental Scan (background)
+
+    private struct IncrementalResult: Sendable {
+        let updatedSessions: [SessionEntry]
+        let newCache: [URL: Date]
+        let changedDirs: Set<URL>
+        let changedFiles: Set<URL>
+        let hasChanges: Bool
+    }
+
+    private nonisolated static func performIncrementalScan(
+        currentSessions: [SessionEntry],
+        mtimeCache: [URL: Date]
+    ) -> IncrementalResult {
         let projectDirs = SessionScanner.discoverProjects()
+        var sessions = currentSessions
+        var cache = mtimeCache
+        var changedDirs = Set<URL>()
+        var changedFiles = Set<URL>()
         var updated = false
+        var seenFiles = Set<URL>()
 
         for projectDir in projectDirs {
             let fm = FileManager.default
@@ -91,43 +154,44 @@ final class SessionStore {
             }
 
             for file in jsonlFiles {
-                let newMtime = SessionScanner.modificationDate(of: file)
-                let oldMtime = mtimeCache[file]
+                seenFiles.insert(file)
+                let newMtime = try? file.resourceValues(
+                    forKeys: [.contentModificationDateKey]
+                ).contentModificationDate
+                let oldMtime = cache[file]
 
                 if oldMtime == nil || newMtime != oldMtime {
-                    // File is new or changed
                     if let entry = SessionParser.extractMetadata(from: file) {
-                        // Remove old entry with same URL
                         sessions.removeAll { $0.jsonlURL == file }
                         sessions.append(entry)
+                        changedDirs.insert(projectDir)
+                        changedFiles.insert(file)
                         updated = true
                     }
-                    mtimeCache[file] = newMtime
+                    cache[file] = newMtime
                 }
             }
         }
 
         // Remove sessions whose files no longer exist
-        let existingURLs = Set(mtimeCache.keys)
-        let before = sessions.count
-        sessions.removeAll { !existingURLs.contains($0.jsonlURL) }
-        if sessions.count != before { updated = true }
-
-        if updated {
-            // Re-run full deduplication to handle continuation chains
-            sessions = SessionScanner.deduplicateSessions(sessions)
-        }
-
-        // If the currently loaded session was updated, refresh it
-        if let loadedId = loadedSessionId,
-           let entry = sessions.first(where: { $0.id == loadedId }) {
-            let newMtime = SessionScanner.modificationDate(of: entry.jsonlURL)
-            if newMtime != mtimeCache[entry.jsonlURL] {
-                Task {
-                    await loadSessionDetail(entry: entry)
-                }
+        let staleFiles = Set(cache.keys).subtracting(seenFiles)
+        if !staleFiles.isEmpty {
+            for file in staleFiles {
+                changedDirs.insert(file.deletingLastPathComponent())
+                cache.removeValue(forKey: file)
             }
+            let beforeCount = sessions.count
+            sessions.removeAll { staleFiles.contains($0.jsonlURL) }
+            if sessions.count != beforeCount { updated = true }
         }
+
+        return IncrementalResult(
+            updatedSessions: sessions,
+            newCache: cache,
+            changedDirs: changedDirs,
+            changedFiles: changedFiles,
+            hasChanges: updated
+        )
     }
 
     // MARK: - Detail Loading

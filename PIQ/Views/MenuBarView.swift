@@ -5,12 +5,27 @@ struct MenuBarView: View {
     @Environment(\.openWindow) private var openWindow
     @State private var searchText = ""
     @State private var projectFilter: String?
-    @State private var stats: ClaudeStats?
+    @State private var displaySessions: [SessionEntry] = []
 
     private var sessionStore: SessionStore? { appState.sessionStore }
 
-    private var filteredSessions: [SessionEntry] {
+    private var uniqueProjects: [(path: String, name: String)] {
         guard let store = sessionStore else { return [] }
+        var seen = Set<String>()
+        var result: [(path: String, name: String)] = []
+        for session in store.sessions {
+            if !session.projectPath.isEmpty && seen.insert(session.projectPath).inserted {
+                result.append((session.projectPath, session.projectName))
+            }
+        }
+        return result.sorted { $0.name.lowercased() < $1.name.lowercased() }
+    }
+
+    private func recomputeFilteredSessions() {
+        guard let store = sessionStore else {
+            displaySessions = []
+            return
+        }
         var result = store.sessions
 
         if let filter = projectFilter {
@@ -26,19 +41,7 @@ struct MenuBarView: View {
             }
         }
 
-        return result
-    }
-
-    private var uniqueProjects: [(path: String, name: String)] {
-        guard let store = sessionStore else { return [] }
-        var seen = Set<String>()
-        var result: [(path: String, name: String)] = []
-        for session in store.sessions {
-            if !session.projectPath.isEmpty && seen.insert(session.projectPath).inserted {
-                result.append((session.projectPath, session.projectName))
-            }
-        }
-        return result.sorted { $0.name.lowercased() < $1.name.lowercased() }
+        displaySessions = result
     }
 
     var body: some View {
@@ -51,11 +54,9 @@ struct MenuBarView: View {
             Divider()
             footer
         }
-        .task {
-            stats = await Task.detached { [sessionStore] in
-                sessionStore?.loadStats()
-            }.value
-        }
+        .onChange(of: sessionStore?.sessions, initial: true) { _, _ in recomputeFilteredSessions() }
+        .onChange(of: searchText) { _, _ in recomputeFilteredSessions() }
+        .onChange(of: projectFilter) { _, _ in recomputeFilteredSessions() }
     }
 
     // MARK: - Header
@@ -72,10 +73,6 @@ struct MenuBarView: View {
                 .foregroundStyle(.tertiary)
             Button {
                 sessionStore?.rescan()
-                Task.detached { [sessionStore] in
-                    let newStats = sessionStore?.loadStats()
-                    await MainActor.run { stats = newStats }
-                }
             } label: {
                 Image(systemName: "arrow.clockwise")
                     .font(.caption)
@@ -169,7 +166,7 @@ struct MenuBarView: View {
         if sessionStore?.isLoading == true {
             ProgressView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if filteredSessions.isEmpty {
+        } else if displaySessions.isEmpty {
             VStack(spacing: 12) {
                 Spacer()
                 Image(systemName: "bubble.left.and.bubble.right")
@@ -184,9 +181,9 @@ struct MenuBarView: View {
         } else {
             ScrollView {
                 VStack(spacing: 0) {
-                    ForEach(filteredSessions) { session in
+                    ForEach(displaySessions) { session in
                         sessionRow(session)
-                        if session.id != filteredSessions.last?.id {
+                        if session.id != displaySessions.last?.id {
                             Divider().padding(.horizontal, 12)
                         }
                     }
@@ -213,16 +210,16 @@ struct MenuBarView: View {
 
     private var footer: some View {
         HStack(spacing: 8) {
-            if let stats {
-                Text("\(formatCount(stats.totalMessages)) msgs")
+            if let stats = sessionStore?.stats {
+                Text("\(stats.totalMessages.formattedCount) msgs")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 Text("·")
                     .foregroundStyle(.quaternary)
-                Text("\(formatCount(stats.totalInputTokens)) in")
+                Text("\(stats.totalInputTokens.formattedCount) in")
                     .font(.caption2)
                     .foregroundStyle(.blue.opacity(0.8))
-                Text("\(formatCount(stats.totalOutputTokens)) out")
+                Text("\(stats.totalOutputTokens.formattedCount) out")
                     .font(.caption2)
                     .foregroundStyle(.green.opacity(0.8))
             }
@@ -249,18 +246,5 @@ struct MenuBarView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-    }
-
-    // MARK: - Helpers
-
-    private func formatCount(_ count: Int) -> String {
-        if count >= 1_000_000_000 {
-            return String(format: "%.1fB", Double(count) / 1_000_000_000)
-        } else if count >= 1_000_000 {
-            return String(format: "%.1fM", Double(count) / 1_000_000)
-        } else if count >= 1_000 {
-            return String(format: "%.1fK", Double(count) / 1_000)
-        }
-        return "\(count)"
     }
 }

@@ -37,7 +37,7 @@ struct SessionDetailView: View {
                         Label(entry.gitBranch, systemImage: "arrow.triangle.branch")
                     }
                     if !entry.model.isEmpty {
-                        Label(shortModelName(entry.model), systemImage: "cpu")
+                        Label(entry.model.shortModelName, systemImage: "cpu")
                     }
                     if !entry.slug.isEmpty {
                         Text(entry.slug)
@@ -62,10 +62,10 @@ struct SessionDetailView: View {
             // Total tokens for the session
             if let totalUsage = totalSessionUsage {
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(formatTokenCount(totalUsage.inputTokens)) in")
+                    Text("\(totalUsage.inputTokens.formattedCount) in")
                         .font(.caption2)
                         .foregroundStyle(.blue)
-                    Text("\(formatTokenCount(totalUsage.outputTokens)) out")
+                    Text("\(totalUsage.outputTokens.formattedCount) out")
                         .font(.caption2)
                         .foregroundStyle(.green)
                 }
@@ -101,19 +101,4 @@ struct SessionDetailView: View {
         return usages.reduce(TokenUsage.zero, +)
     }
 
-    private func shortModelName(_ model: String) -> String {
-        if model.contains("opus") { return "Opus" }
-        if model.contains("sonnet") { return "Sonnet" }
-        if model.contains("haiku") { return "Haiku" }
-        return model
-    }
-
-    private func formatTokenCount(_ count: Int) -> String {
-        if count >= 1_000_000 {
-            return String(format: "%.1fM", Double(count) / 1_000_000)
-        } else if count >= 1_000 {
-            return String(format: "%.1fK", Double(count) / 1_000)
-        }
-        return "\(count)"
-    }
 }

@@ -13,12 +13,27 @@ struct SessionWindowView: View {
     @State private var selection: SidebarSelection? = .overview
     @State private var searchText = ""
     @State private var projectFilter: String?
-    @State private var stats: ClaudeStats?
+    @State private var displaySessions: [SessionEntry] = []
 
     private var sessionStore: SessionStore? { appState.sessionStore }
 
-    private var filteredSessions: [SessionEntry] {
+    private var uniqueProjects: [(path: String, name: String)] {
         guard let store = sessionStore else { return [] }
+        var seen = Set<String>()
+        var result: [(path: String, name: String)] = []
+        for session in store.sessions {
+            if !session.projectPath.isEmpty && seen.insert(session.projectPath).inserted {
+                result.append((session.projectPath, session.projectName))
+            }
+        }
+        return result.sorted { $0.name.lowercased() < $1.name.lowercased() }
+    }
+
+    private func recomputeFilteredSessions() {
+        guard let store = sessionStore else {
+            displaySessions = []
+            return
+        }
         var result = store.sessions
 
         if let filter = projectFilter {
@@ -35,19 +50,7 @@ struct SessionWindowView: View {
             }
         }
 
-        return result
-    }
-
-    private var uniqueProjects: [(path: String, name: String)] {
-        guard let store = sessionStore else { return [] }
-        var seen = Set<String>()
-        var result: [(path: String, name: String)] = []
-        for session in store.sessions {
-            if !session.projectPath.isEmpty && seen.insert(session.projectPath).inserted {
-                result.append((session.projectPath, session.projectName))
-            }
-        }
-        return result.sorted { $0.name.lowercased() < $1.name.lowercased() }
+        displaySessions = result
     }
 
     var body: some View {
@@ -65,23 +68,21 @@ struct SessionWindowView: View {
             if let pending = appState.pendingSessionId {
                 selection = .session(pending)
                 appState.pendingSessionId = nil
-                if let entry = filteredSessions.first(where: { $0.id == pending }) {
+                if let entry = sessionStore?.sessions.first(where: { $0.id == pending }) {
                     Task {
                         await sessionStore?.loadSessionDetail(entry: entry)
                     }
                 }
             }
         }
-        .task {
-            stats = await Task.detached { [sessionStore] in
-                sessionStore?.loadStats()
-            }.value
-        }
+        .onChange(of: sessionStore?.sessions, initial: true) { _, _ in recomputeFilteredSessions() }
+        .onChange(of: searchText) { _, _ in recomputeFilteredSessions() }
+        .onChange(of: projectFilter) { _, _ in recomputeFilteredSessions() }
         .onChange(of: appState.pendingSessionId) { _, newValue in
             guard let pending = newValue else { return }
             selection = .session(pending)
             appState.pendingSessionId = nil
-            if let entry = filteredSessions.first(where: { $0.id == pending }) {
+            if let entry = sessionStore?.sessions.first(where: { $0.id == pending }) {
                 Task {
                     await sessionStore?.loadSessionDetail(entry: entry)
                 }
@@ -167,7 +168,7 @@ struct SessionWindowView: View {
             Divider()
 
             // Session list
-            if filteredSessions.isEmpty && searchText.isEmpty {
+            if displaySessions.isEmpty && searchText.isEmpty {
                 ContentUnavailableView {
                     Label("No Sessions", systemImage: "bubble.left.and.bubble.right")
                 } description: {
@@ -179,14 +180,14 @@ struct SessionWindowView: View {
                         .tag(SidebarSelection.overview)
 
                     Section {
-                        if filteredSessions.isEmpty {
+                        if displaySessions.isEmpty {
                             Text("No sessions match your search")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity, alignment: .center)
                                 .padding(.vertical, 8)
                         } else {
-                            ForEach(filteredSessions) { session in
+                            ForEach(displaySessions) { session in
                                 SessionRowView(entry: session)
                                     .tag(SidebarSelection.session(session.id))
                             }
@@ -198,7 +199,7 @@ struct SessionWindowView: View {
                 .listStyle(.sidebar)
                 .onChange(of: selection) { _, newValue in
                     if case .session(let id) = newValue,
-                       let entry = filteredSessions.first(where: { $0.id == id }) {
+                       let entry = displaySessions.first(where: { $0.id == id }) {
                         Task {
                             await sessionStore?.loadSessionDetail(entry: entry)
                         }
@@ -208,7 +209,7 @@ struct SessionWindowView: View {
                 }
             }
 
-            if let stats {
+            if let stats = sessionStore?.stats {
                 Divider()
                 sidebarFooter(stats: stats)
             }
@@ -219,32 +220,21 @@ struct SessionWindowView: View {
 
     private func sidebarFooter(stats: ClaudeStats) -> some View {
         HStack(spacing: 8) {
-            Text("\(formatCount(stats.totalMessages)) msgs")
+            Text("\(stats.totalMessages.formattedCount) msgs")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             Text("·")
                 .foregroundStyle(.quaternary)
-            Text("\(formatCount(stats.totalInputTokens)) in")
+            Text("\(stats.totalInputTokens.formattedCount) in")
                 .font(.caption2)
                 .foregroundStyle(.blue.opacity(0.8))
-            Text("\(formatCount(stats.totalOutputTokens)) out")
+            Text("\(stats.totalOutputTokens.formattedCount) out")
                 .font(.caption2)
                 .foregroundStyle(.green.opacity(0.8))
             Spacer()
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-    }
-
-    private func formatCount(_ count: Int) -> String {
-        if count >= 1_000_000_000 {
-            return String(format: "%.1fB", Double(count) / 1_000_000_000)
-        } else if count >= 1_000_000 {
-            return String(format: "%.1fM", Double(count) / 1_000_000)
-        } else if count >= 1_000 {
-            return String(format: "%.1fK", Double(count) / 1_000)
-        }
-        return "\(count)"
     }
 
     // MARK: - Detail
@@ -254,15 +244,15 @@ struct SessionWindowView: View {
         switch selection {
         case .session(let id):
             if let store = sessionStore,
-               let entry = filteredSessions.first(where: { $0.id == id }) {
+               let entry = displaySessions.first(where: { $0.id == id }) {
                 SessionDetailView(entry: entry, store: store)
             }
         case .overview:
-            if let stats, let store = sessionStore {
+            if let stats = sessionStore?.stats, let store = sessionStore {
                 StatsOverviewView(stats: stats, sessions: store.sessions)
             }
         case nil:
-            if let stats, let store = sessionStore {
+            if let stats = sessionStore?.stats, let store = sessionStore {
                 StatsOverviewView(stats: stats, sessions: store.sessions)
             } else {
                 ContentUnavailableView {
