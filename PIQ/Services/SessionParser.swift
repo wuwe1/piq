@@ -73,7 +73,10 @@ enum SessionParser {
                 }
             }
             if lineType == "assistant" {
-                assistantCount += 1
+                let isSynthetic = (json["message"] as? [String: Any])?["model"] as? String ?? ""
+                if !isSynthetic.hasPrefix("<") {
+                    assistantCount += 1
+                }
                 if let msg = json["message"] as? [String: Any],
                    let usage = msg["usage"] as? [String: Any] {
                     inputTokens += usage["input_tokens"] as? Int ?? 0
@@ -83,10 +86,11 @@ enum SessionParser {
                 }
             }
 
-            // Extract model from assistant message
+            // Extract model from assistant message (skip synthetic placeholder)
             if model.isEmpty, lineType == "assistant",
                let msg = json["message"] as? [String: Any],
-               let m = msg["model"] as? String {
+               let m = msg["model"] as? String,
+               !m.hasPrefix("<") {
                 model = m
             }
 
