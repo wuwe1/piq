@@ -48,18 +48,35 @@ struct SessionDetailView: View {
     }
 
     /// Turns that have a real user message (for the inspector TOC).
+    /// Turns without an assistant response are merged into the next turn
+    /// (e.g. text + image sent together may produce two JSONL entries).
     private var userTurns: [(index: Int, turn: SessionTurn, text: String)] {
         var result: [(index: Int, turn: SessionTurn, text: String)] = []
         var idx = 0
+        var pendingTexts: [String] = []
+
         for turn in store.loadedTurns {
             guard let userMsg = turn.userMessage else { continue }
-            idx += 1
+
             let text = userMsg.contentBlocks.compactMap { block -> String? in
                 if case .text(_, let t) = block { return t }
                 return nil
             }.first ?? ""
-            if !text.isEmpty {
-                result.append((idx, turn, text))
+
+            let hasResponse = !turn.assistantMessages.isEmpty || !turn.toolPairs.isEmpty
+
+            if !hasResponse {
+                if !text.isEmpty { pendingTexts.append(text) }
+                continue
+            }
+
+            idx += 1
+            if !text.isEmpty { pendingTexts.append(text) }
+            let combined = pendingTexts.joined(separator: "\n")
+            pendingTexts = []
+
+            if !combined.isEmpty {
+                result.append((idx, turn, combined))
             }
         }
         return result
