@@ -4,6 +4,7 @@ import SwiftUI
 /// rendered in the original sequential order (thinking → text → tool → thinking → …).
 struct SessionTurnView: View {
     let turn: SessionTurn
+    var expandAll: Bool = false
 
     /// A renderable item in the turn, preserving the original order from contentBlocks.
     private enum TurnItem: Identifiable {
@@ -60,7 +61,7 @@ struct SessionTurnView: View {
                 case .contentBlock(let block):
                     SessionContentBlockView(block: block)
                 case .toolCall(let pair):
-                    SessionToolCallView(pair: pair)
+                    SessionToolCallView(pair: pair, expandAll: expandAll)
                 }
             }
 

@@ -1,10 +1,12 @@
 import SwiftUI
 
 /// Displays a tool call with its input and output.
+/// Clicking the header row toggles expand/collapse of the combined content.
 struct SessionToolCallView: View {
     let pair: ToolCallPair
-    @State private var showInput = false
-    @State private var showOutput = false
+    var expandAll: Bool = false
+
+    @State private var isExpanded = false
     @State private var showAgent = false
 
     private var toolInfo: (color: Color, icon: String) {
@@ -27,43 +29,60 @@ struct SessionToolCallView: View {
         }
     }
 
+    /// Parsed JSON input for structured display.
+    private var parsedInput: [String: Any]? {
+        guard let data = pair.inputJSON.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        return json
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Tool header
-            toolHeader
+            VStack(alignment: .leading, spacing: 0) {
+                toolHeader
 
-            // Input section
-            if showInput {
-                inputSection
+                if isExpanded {
+                    Divider().padding(.horizontal, 10)
+                    expandedContent
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation(.easeInOut(duration: 0.15)) { isExpanded.toggle() }
             }
 
-            // Output section
-            if showOutput, let output = pair.output {
-                outputSection(output)
-            }
-
-            // Agent conversation (for Task tool calls)
+            // Agent conversation (outside tap area)
             if let agentTurns = pair.agentTurns, !agentTurns.isEmpty {
                 agentSection(agentTurns)
             }
         }
-        .background(toolInfo.color.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
+        .background(toolInfo.color.opacity(0.04))
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
+            Rectangle()
                 .strokeBorder(toolInfo.color.opacity(0.15), lineWidth: 1)
         )
+        .onChange(of: expandAll) { _, newValue in
+            withAnimation(.easeInOut(duration: 0.15)) { isExpanded = newValue }
+        }
     }
 
     // MARK: - Tool Header
 
     private var toolHeader: some View {
         HStack(spacing: 6) {
+            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(.tertiary)
+                .frame(width: 10)
+
             Image(systemName: toolInfo.icon)
                 .font(.caption)
                 .foregroundStyle(toolInfo.color)
                 .frame(width: 16)
 
-            Text(displayName)
+            Text(pair.name)
                 .font(.caption)
                 .fontWeight(.medium)
                 .foregroundStyle(toolInfo.color)
@@ -74,6 +93,13 @@ struct SessionToolCallView: View {
                     .foregroundStyle(.tertiary)
             }
 
+            // Inline summary
+            Text(headerSummary)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
             if pair.isError {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.caption2)
@@ -82,21 +108,9 @@ struct SessionToolCallView: View {
 
             Spacer()
 
-            HStack(spacing: 4) {
-                togglePill("Input", icon: "arrow.right.circle", isOn: showInput) {
-                    withAnimation(.easeInOut(duration: 0.15)) { showInput.toggle() }
-                }
-
-                if pair.output != nil {
-                    togglePill("Output", icon: "arrow.left.circle", isOn: showOutput) {
-                        withAnimation(.easeInOut(duration: 0.15)) { showOutput.toggle() }
-                    }
-                }
-
-                if pair.agentTurns != nil {
-                    togglePill("Agent", icon: "person.2", isOn: showAgent, tint: .cyan) {
-                        withAnimation(.easeInOut(duration: 0.15)) { showAgent.toggle() }
-                    }
+            if pair.agentTurns != nil {
+                togglePill("Agent", icon: "person.2", isOn: showAgent, tint: .cyan) {
+                    withAnimation(.easeInOut(duration: 0.15)) { showAgent.toggle() }
                 }
             }
         }
@@ -104,45 +118,148 @@ struct SessionToolCallView: View {
         .padding(.vertical, 6)
     }
 
-    // MARK: - Input Section
+    // MARK: - Header Summary
 
-    private var inputSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Divider().padding(.horizontal, 10)
-            ScrollView {
-                Text(pair.inputJSON)
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(10)
-            }
-            .frame(maxHeight: 150)
+    private var headerSummary: String {
+        guard let input = parsedInput else { return "" }
+        switch pair.name {
+        case "Edit":
+            return (input["file_path"] as? String).map { ($0 as NSString).lastPathComponent } ?? ""
+        case "Read":
+            return (input["file_path"] as? String).map { ($0 as NSString).lastPathComponent } ?? ""
+        case "Write":
+            return (input["file_path"] as? String).map { ($0 as NSString).lastPathComponent } ?? ""
+        case "Bash":
+            let cmd = input["command"] as? String ?? ""
+            return String(cmd.prefix(80))
+        case "Glob":
+            return input["pattern"] as? String ?? ""
+        case "Grep":
+            return input["pattern"] as? String ?? ""
+        case "WebSearch":
+            return input["query"] as? String ?? ""
+        case "WebFetch":
+            return input["url"] as? String ?? ""
+        case "Task":
+            return input["description"] as? String ?? ""
+        default:
+            return ""
         }
+    }
+
+    // MARK: - Expanded Content
+
+    @ViewBuilder
+    private var expandedContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Tool-specific input rendering
+            if pair.name == "Edit", let input = parsedInput {
+                editDiffView(input)
+            } else {
+                rawInputView
+            }
+
+            // Output
+            if let output = pair.output {
+                Divider().padding(.horizontal, 10)
+                outputSection(output)
+            }
+        }
+    }
+
+    // MARK: - Edit Diff View
+
+    private func editDiffView(_ input: [String: Any]) -> some View {
+        let filePath = input["file_path"] as? String ?? ""
+        let oldStr = input["old_string"] as? String ?? ""
+        let newStr = input["new_string"] as? String ?? ""
+
+        return VStack(alignment: .leading, spacing: 0) {
+            // File path
+            if !filePath.isEmpty {
+                Text(filePath)
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.quaternary.opacity(0.3))
+            }
+
+            // Diff
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Removed lines
+                    ForEach(Array(oldStr.components(separatedBy: "\n").enumerated()), id: \.offset) { _, line in
+                        HStack(spacing: 0) {
+                            Text("−")
+                                .frame(width: 16)
+                                .foregroundStyle(.red.opacity(0.6))
+                            Text(line)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.red)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 1)
+                        .background(.red.opacity(0.08))
+                    }
+
+                    // Added lines
+                    ForEach(Array(newStr.components(separatedBy: "\n").enumerated()), id: \.offset) { _, line in
+                        HStack(spacing: 0) {
+                            Text("+")
+                                .frame(width: 16)
+                                .foregroundStyle(.green.opacity(0.6))
+                            Text(line)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.green)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 1)
+                        .background(.green.opacity(0.08))
+                    }
+                }
+                .textSelection(.enabled)
+            }
+            .frame(maxHeight: 300)
+        }
+    }
+
+    // MARK: - Raw Input
+
+    private var rawInputView: some View {
+        ScrollView {
+            Text(pair.inputJSON)
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10)
+        }
+        .frame(maxHeight: 150)
     }
 
     // MARK: - Output Section
 
     private func outputSection(_ output: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Divider().padding(.horizontal, 10)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(output.prefix(5000))
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(pair.isError ? .red : .secondary)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    if output.count > 5000 {
-                        Text("… truncated (\(output.count) chars)")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                    }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(output.prefix(5000))
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(pair.isError ? .red : .secondary)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if output.count > 5000 {
+                    Text("… truncated (\(output.count) chars)")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
                 }
-                .padding(10)
             }
-            .frame(maxHeight: 200)
+            .padding(10)
         }
+        .frame(maxHeight: 200)
     }
 
     // MARK: - Agent Section
@@ -153,14 +270,13 @@ struct SessionToolCallView: View {
                 Divider().padding(.horizontal, 10)
 
                 HStack(spacing: 0) {
-                    // Left accent border
                     Rectangle()
                         .fill(.cyan.opacity(0.3))
                         .frame(width: 2)
 
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(turns) { turn in
-                            SessionTurnView(turn: turn)
+                            SessionTurnView(turn: turn, expandAll: expandAll)
                         }
                     }
                     .padding(10)
@@ -192,11 +308,5 @@ struct SessionToolCallView: View {
             .background(isOn ? color.opacity(0.8) : color.opacity(0.1), in: Capsule())
         }
         .buttonStyle(.plain)
-    }
-
-    // MARK: - Display Name
-
-    private var displayName: String {
-        pair.name
     }
 }
