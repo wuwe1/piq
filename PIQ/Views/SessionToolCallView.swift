@@ -149,15 +149,24 @@ struct SessionToolCallView: View {
 
     @ViewBuilder
     private var expandedContent: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Tool-specific input rendering
-            if pair.name == "Edit", let input = parsedInput {
-                editDiffView(input)
-            } else {
-                rawInputView
+        if let input = parsedInput {
+            switch pair.name {
+            case "Edit":  editExpandedView(input)
+            case "Write": writeExpandedView(input)
+            case "Bash":  bashExpandedView(input)
+            case "Read":  readExpandedView(input)
+            case "Grep":  grepExpandedView(input)
+            case "Glob":  globExpandedView(input)
+            default:      genericExpandedView
             }
+        } else {
+            genericExpandedView
+        }
+    }
 
-            // Output
+    private var genericExpandedView: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            rawInputView
             if let output = pair.output {
                 Divider().padding(.horizontal, 10)
                 outputSection(output)
@@ -165,7 +174,23 @@ struct SessionToolCallView: View {
         }
     }
 
-    // MARK: - Edit Diff View
+    // MARK: - Shared: File Path Header
+
+    private func filePathHeader(_ path: String) -> some View {
+        Text(path)
+            .font(.system(.caption2, design: .monospaced))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.quaternary.opacity(0.3))
+    }
+
+    // MARK: - Edit Tool
+
+    private func editExpandedView(_ input: [String: Any]) -> some View {
+        editDiffView(input)
+    }
 
     private func editDiffView(_ input: [String: Any]) -> some View {
         let filePath = input["file_path"] as? String ?? ""
@@ -174,15 +199,7 @@ struct SessionToolCallView: View {
         let lines = Self.computeLineDiff(old: oldStr, new: newStr)
 
         return VStack(alignment: .leading, spacing: 0) {
-            if !filePath.isEmpty {
-                Text(filePath)
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.quaternary.opacity(0.3))
-            }
+            if !filePath.isEmpty { filePathHeader(filePath) }
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
@@ -194,6 +211,215 @@ struct SessionToolCallView: View {
             }
             .frame(maxHeight: 300)
         }
+    }
+
+    // MARK: - Write Tool
+
+    private func writeExpandedView(_ input: [String: Any]) -> some View {
+        let filePath = input["file_path"] as? String ?? ""
+        let content = input["content"] as? String ?? ""
+
+        return VStack(alignment: .leading, spacing: 0) {
+            if !filePath.isEmpty { filePathHeader(filePath) }
+
+            ScrollView {
+                Text(content.prefix(8000))
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.primary.opacity(0.85))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+            }
+            .frame(maxHeight: 300)
+        }
+    }
+
+    // MARK: - Bash Tool
+
+    private func bashExpandedView(_ input: [String: Any]) -> some View {
+        let command = input["command"] as? String ?? ""
+        let description = input["description"] as? String
+
+        return VStack(alignment: .leading, spacing: 0) {
+            // Description
+            if let desc = description, !desc.isEmpty {
+                Text(desc)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.top, 6)
+                    .padding(.bottom, 2)
+            }
+
+            // Command prompt
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 4) {
+                    Text("$")
+                        .foregroundStyle(.green.opacity(0.7))
+                    Text(command)
+                        .foregroundStyle(.primary.opacity(0.9))
+                        .textSelection(.enabled)
+                }
+                .font(.system(.caption, design: .monospaced))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+            }
+            .background(.black.opacity(0.15))
+
+            // Output
+            if let output = pair.output, !output.isEmpty {
+                bashOutputView(output)
+            }
+        }
+    }
+
+    private func bashOutputView(_ output: String) -> some View {
+        ScrollView {
+            Text(output.prefix(8000))
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(pair.isError ? .red : .secondary)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10)
+        }
+        .frame(maxHeight: 200)
+    }
+
+    // MARK: - Read Tool
+
+    private func readExpandedView(_ input: [String: Any]) -> some View {
+        let filePath = input["file_path"] as? String ?? ""
+
+        return VStack(alignment: .leading, spacing: 0) {
+            if !filePath.isEmpty { filePathHeader(filePath) }
+
+            if let output = pair.output {
+                readOutputView(output)
+            }
+        }
+    }
+
+    private func readOutputView(_ output: String) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(output.components(separatedBy: "\n").enumerated()), id: \.offset) { _, rawLine in
+                    readLineRow(rawLine)
+                }
+            }
+            .textSelection(.enabled)
+        }
+        .frame(maxHeight: 300)
+    }
+
+    private func readLineRow(_ rawLine: String) -> some View {
+        let parsed = Self.parseReadLine(rawLine)
+        return HStack(alignment: .top, spacing: 0) {
+            Text(parsed.lineNum)
+                .foregroundStyle(.tertiary)
+                .frame(width: 36, alignment: .trailing)
+                .padding(.trailing, 6)
+            Text(parsed.content)
+                .foregroundStyle(.primary.opacity(0.85))
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .font(.system(.caption, design: .monospaced))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 0.5)
+    }
+
+    private static func parseReadLine(_ line: String) -> (lineNum: String, content: String) {
+        // Format: "     1→content"
+        guard let idx = line.firstIndex(of: "\u{2192}") else { // → character
+            return ("", line)
+        }
+        let num = String(line[line.startIndex..<idx]).trimmingCharacters(in: .whitespaces)
+        let content = String(line[line.index(after: idx)...])
+        return (num, content)
+    }
+
+    // MARK: - Grep Tool
+
+    private func grepExpandedView(_ input: [String: Any]) -> some View {
+        let pattern = input["pattern"] as? String ?? ""
+        let path = input["path"] as? String
+        let mode = input["output_mode"] as? String ?? "files_with_matches"
+
+        return VStack(alignment: .leading, spacing: 0) {
+            // Pattern info
+            HStack(spacing: 6) {
+                Text("/\(pattern)/")
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.blue)
+                if let p = path {
+                    Text("in")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    Text((p as NSString).lastPathComponent)
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
+                Text(mode.replacingOccurrences(of: "_", with: " "))
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.quaternary.opacity(0.3))
+
+            // Results
+            if let output = pair.output, !output.isEmpty {
+                searchResultsView(output)
+            }
+        }
+    }
+
+    // MARK: - Glob Tool
+
+    private func globExpandedView(_ input: [String: Any]) -> some View {
+        let pattern = input["pattern"] as? String ?? ""
+
+        return VStack(alignment: .leading, spacing: 0) {
+            // Pattern info
+            Text(pattern)
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(.blue)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.quaternary.opacity(0.3))
+
+            // Results
+            if let output = pair.output, !output.isEmpty {
+                searchResultsView(output)
+            }
+        }
+    }
+
+    /// Shared view for file list / search results output.
+    private func searchResultsView(_ output: String) -> some View {
+        let lines = output.components(separatedBy: "\n").filter { !$0.isEmpty }
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(lines.prefix(500).enumerated()), id: \.offset) { _, line in
+                    Text(line)
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 1.5)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if lines.count > 500 {
+                    Text("… \(lines.count - 500) more")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                }
+            }
+            .textSelection(.enabled)
+        }
+        .frame(maxHeight: 200)
     }
 
     private func diffLineRow(_ line: DiffDisplayLine) -> some View {
