@@ -2,7 +2,8 @@ import Foundation
 
 /// Lightweight model for session list display.
 struct SessionEntry: Identifiable, Equatable, Sendable, Codable {
-    let id: String              // sessionId
+    let id: String              // fileUUID (unique per JSONL file)
+    let sessionId: String       // sessionId from JSONL content
     let projectPath: String     // from cwd field
     let projectName: String     // last component of path
     let firstPrompt: String     // first user text (truncated)
@@ -21,6 +22,10 @@ struct SessionEntry: Identifiable, Equatable, Sendable, Codable {
     let outputTokens: Int       // sum of output_tokens from all assistant messages
     let cacheReadTokens: Int    // sum of cache_read_input_tokens
     let cacheCreationTokens: Int // sum of cache_creation_input_tokens
+
+    /// If this is a continuation, returns the parent file's UUID.
+    var parentFileId: String? { sessionId != id ? sessionId : nil }
+    var isContinuation: Bool { sessionId != id }
 }
 
 // MARK: - Shared Formatting

@@ -3,11 +3,34 @@ import SwiftUI
 /// Detail view showing a full session conversation.
 struct SessionDetailView: View {
     let entry: SessionEntry
+    let sessions: [SessionEntry]
     @Bindable var store: SessionStore
+    var onNavigate: ((String) -> Void)?
+
+    /// The child continuation session (if any) that continues from this session.
+    private var childSession: SessionEntry? {
+        sessions.first { $0.parentFileId == entry.id }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             sessionHeader
+
+            if entry.isContinuation {
+                continuationBanner(
+                    label: "Continued from previous session",
+                    systemImage: "arrow.left",
+                    targetId: entry.parentFileId
+                )
+            }
+            if let child = childSession {
+                continuationBanner(
+                    label: "Continued in next session",
+                    systemImage: "arrow.right",
+                    targetId: child.id
+                )
+            }
+
             Divider()
 
             if store.isLoadingDetail {
@@ -23,6 +46,26 @@ struct SessionDetailView: View {
                 turnsList
             }
         }
+    }
+
+    // MARK: - Continuation Banner
+
+    private func continuationBanner(label: String, systemImage: String, targetId: String?) -> some View {
+        Button {
+            if let targetId { onNavigate?(targetId) }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: systemImage)
+                Text(label)
+            }
+            .font(.caption)
+            .foregroundStyle(.blue)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+            .background(.blue.opacity(0.06))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Header

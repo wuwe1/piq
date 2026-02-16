@@ -90,6 +90,17 @@ struct SessionWindowView: View {
         }
     }
 
+    // MARK: - Navigation
+
+    private func navigateToSession(_ fileId: String) {
+        selection = .session(fileId)
+        if let entry = sessionStore?.sessions.first(where: { $0.id == fileId }) {
+            Task {
+                await sessionStore?.loadSessionDetail(entry: entry)
+            }
+        }
+    }
+
     // MARK: - Sidebar
 
     private var selectedProjectName: String {
@@ -245,7 +256,14 @@ struct SessionWindowView: View {
         case .session(let id):
             if let store = sessionStore,
                let entry = displaySessions.first(where: { $0.id == id }) {
-                SessionDetailView(entry: entry, store: store)
+                SessionDetailView(
+                    entry: entry,
+                    sessions: store.sessions,
+                    store: store,
+                    onNavigate: { targetId in
+                        navigateToSession(targetId)
+                    }
+                )
             }
         case .overview:
             if let stats = sessionStore?.stats, let store = sessionStore {

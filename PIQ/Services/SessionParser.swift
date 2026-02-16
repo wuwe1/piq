@@ -118,6 +118,8 @@ enum SessionParser {
 
         guard let sid = sessionId else { return nil }
 
+        let fileUUID = url.deletingPathExtension().lastPathComponent
+
         // Use file modification date as fallback for missing timestamps
         let fileMtime = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
 
@@ -138,7 +140,8 @@ enum SessionParser {
         let projectName = (projectPath as NSString).lastPathComponent
 
         return SessionEntry(
-            id: sid,
+            id: fileUUID,
+            sessionId: sid,
             projectPath: projectPath,
             projectName: projectName,
             firstPrompt: firstPrompt,

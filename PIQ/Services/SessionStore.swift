@@ -163,11 +163,11 @@ final class SessionStore {
                     self.scanProgress = progress
                 }
             }
-            let deduped = SessionScanner.deduplicateSessions(result.allEntries)
-            let newStats = Self.computeStats(from: deduped)
+            let sorted = result.allEntries.sorted { $0.lastActivityAt > $1.lastActivityAt }
+            let newStats = Self.computeStats(from: sorted)
             result.updatedIndex.save()
             await MainActor.run {
-                self.sessions = deduped
+                self.sessions = sorted
                 self.sessionIndex = result.updatedIndex
                 self.stats = newStats
                 self.scanProgress = nil
@@ -187,20 +187,20 @@ final class SessionStore {
 
             guard result.hasChanges else { return }
 
-            let deduped = SessionScanner.deduplicateSessions(result.allEntries)
-            let newStats = Self.computeStats(from: deduped)
+            let sorted = result.allEntries.sorted { $0.lastActivityAt > $1.lastActivityAt }
+            let newStats = Self.computeStats(from: sorted)
             result.updatedIndex.save()
 
             // Check if loaded session needs detail refresh
             var detailEntry: SessionEntry?
             if let loadedId,
-               let entry = deduped.first(where: { $0.id == loadedId }),
+               let entry = sorted.first(where: { $0.id == loadedId }),
                result.changedFiles.contains(entry.jsonlURL) {
                 detailEntry = entry
             }
 
             await MainActor.run {
-                self.sessions = deduped
+                self.sessions = sorted
                 self.sessionIndex = result.updatedIndex
                 self.stats = newStats
 
@@ -321,7 +321,7 @@ final class SessionStore {
         }
 
         let url = entry.jsonlURL
-        let sessionId = entry.id
+        let sessionId = entry.sessionId
         let turns = await Task.detached(priority: .userInitiated) {
             let messages = SessionParser.parseFile(at: url)
             var turns = SessionParser.groupIntoTurns(messages)
