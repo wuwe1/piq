@@ -8,8 +8,8 @@ struct SessionContentBlockView: View {
         switch block {
         case .text(_, let text):
             MarkdownTextView(text: text)
-        case .thinking(_, let text):
-            ThinkingBlockView(text: text)
+        case .thinking(let id, let text):
+            ThinkingBlockView(blockId: id, text: text)
         case .toolUse:
             EmptyView()
         case .toolResult:
@@ -19,9 +19,13 @@ struct SessionContentBlockView: View {
 }
 
 /// Thinking block with click-anywhere expand/collapse.
+/// Uses ExpandState from environment so state survives view recreation.
 private struct ThinkingBlockView: View {
+    let blockId: String
     let text: String
-    @State private var isExpanded = false
+    @Environment(ExpandState.self) private var expandState
+
+    private var isExpanded: Bool { expandState.isExpanded(blockId) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -53,7 +57,7 @@ private struct ThinkingBlockView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            withAnimation(.easeInOut(duration: 0.15)) { isExpanded.toggle() }
+            withAnimation(.easeInOut(duration: 0.15)) { expandState.toggle(blockId) }
         }
         .background(.purple.opacity(0.05))
     }

@@ -4,10 +4,11 @@ import SwiftUI
 /// Clicking the header row toggles expand/collapse of the combined content.
 struct SessionToolCallView: View {
     let pair: ToolCallPair
-    var expandAll: Bool = false
 
-    @State private var isExpanded = false
+    @Environment(ExpandState.self) private var expandState
     @State private var showAgent = false
+
+    private var isExpanded: Bool { expandState.isExpanded(pair.id) }
 
     private var toolInfo: (color: Color, icon: String) {
         let name = pair.name.lowercased()
@@ -50,7 +51,7 @@ struct SessionToolCallView: View {
             }
             .contentShape(Rectangle())
             .onTapGesture {
-                withAnimation(.easeInOut(duration: 0.15)) { isExpanded.toggle() }
+                withAnimation(.easeInOut(duration: 0.15)) { expandState.toggle(pair.id) }
             }
 
             // Agent conversation (outside tap area)
@@ -63,9 +64,6 @@ struct SessionToolCallView: View {
             Rectangle()
                 .strokeBorder(toolInfo.color.opacity(0.15), lineWidth: 1)
         )
-        .onChange(of: expandAll) { _, newValue in
-            withAnimation(.easeInOut(duration: 0.15)) { isExpanded = newValue }
-        }
     }
 
     // MARK: - Tool Header
@@ -445,7 +443,7 @@ struct SessionToolCallView: View {
 
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(turns) { turn in
-                            SessionTurnView(turn: turn, expandAll: expandAll)
+                            SessionTurnView(turn: turn)
                         }
                     }
                     .padding(10)
