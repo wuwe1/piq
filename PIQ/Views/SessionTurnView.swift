@@ -1,8 +1,51 @@
 import SwiftUI
 
-/// Displays a single conversation turn: user message + assistant response + tool calls.
+/// Displays a single conversation turn: user message + assistant response + tool calls,
+/// rendered in the original sequential order (thinking → text → tool → thinking → …).
 struct SessionTurnView: View {
     let turn: SessionTurn
+
+    /// A renderable item in the turn, preserving the original order from contentBlocks.
+    private enum TurnItem: Identifiable {
+        case contentBlock(SessionContentBlock)
+        case toolCall(ToolCallPair)
+
+        var id: String {
+            switch self {
+            case .contentBlock(let b): b.id
+            case .toolCall(let p): p.id
+            }
+        }
+    }
+
+    private var orderedItems: [TurnItem] {
+        let toolMap = Dictionary(uniqueKeysWithValues: turn.toolPairs.map { ($0.id, $0) })
+        var usedToolIds = Set<String>()
+        var items: [TurnItem] = []
+
+        for msg in turn.assistantMessages {
+            for block in msg.contentBlocks {
+                switch block {
+                case .toolUse(_, let toolId, _, _, _):
+                    if let pair = toolMap[toolId] {
+                        items.append(.toolCall(pair))
+                        usedToolIds.insert(pair.id)
+                    }
+                case .toolResult:
+                    break // handled via ToolCallPair
+                default:
+                    items.append(.contentBlock(block))
+                }
+            }
+        }
+
+        // Append any unmatched tool pairs (safety fallback)
+        for pair in turn.toolPairs where !usedToolIds.contains(pair.id) {
+            items.append(.toolCall(pair))
+        }
+
+        return items
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -11,16 +54,12 @@ struct SessionTurnView: View {
                 userBubble(userMsg)
             }
 
-            // Assistant content blocks
-            ForEach(turn.assistantMessages) { msg in
-                ForEach(msg.contentBlocks) { block in
+            // Interleaved assistant content + tool calls in original order
+            ForEach(orderedItems) { item in
+                switch item {
+                case .contentBlock(let block):
                     SessionContentBlockView(block: block)
-                }
-            }
-
-            // Tool calls
-            if !turn.toolPairs.isEmpty {
-                ForEach(turn.toolPairs) { pair in
+                case .toolCall(let pair):
                     SessionToolCallView(pair: pair)
                 }
             }
