@@ -196,7 +196,7 @@ struct MenuBarView: View {
             .frame(maxWidth: .infinity)
         } else {
             ScrollView {
-                VStack(spacing: 0) {
+                LazyVStack(spacing: 0) {
                     ForEach(displaySessions) { session in
                         sessionRow(session)
                         if session.id != displaySessions.last?.id {

@@ -50,13 +50,34 @@ struct SessionDetailView: View {
 
             Spacer()
 
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(entry.createdAt, style: .date)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(entry.createdAt, style: .time)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+            // Time info
+            HStack(spacing: 16) {
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("Started")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    Text(entry.createdAt.formatted(.dateTime.month(.abbreviated).day().hour().minute()))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("Duration")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    Text(formattedDuration)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("Last Active")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    Text(entry.lastActivityAt, style: .relative)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             // Total tokens for the session
@@ -69,12 +90,23 @@ struct SessionDetailView: View {
                         .font(.caption2)
                         .foregroundStyle(.green)
                 }
-                .padding(.leading, 8)
+                .padding(.leading, 4)
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(.bar)
+    }
+
+    private var formattedDuration: String {
+        let interval = entry.lastActivityAt.timeIntervalSince(entry.createdAt)
+        guard interval > 0 else { return "—" }
+        let hours = Int(interval) / 3600
+        let minutes = (Int(interval) % 3600) / 60
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        }
+        return "\(minutes)m"
     }
 
     // MARK: - Turns List

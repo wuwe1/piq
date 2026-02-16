@@ -24,11 +24,33 @@ struct SessionRowView: View {
                     .foregroundStyle(.tertiary)
             }
 
-            // First prompt
-            Text(entry.firstPrompt.isEmpty ? "(no prompt)" : entry.firstPrompt)
-                .font(.subheadline)
-                .lineLimit(2)
-                .foregroundStyle(.primary)
+            // Three preview lines
+            VStack(alignment: .leading, spacing: 2) {
+                // First user prompt
+                previewLine(
+                    icon: "bubble.right",
+                    text: entry.firstPrompt.isEmpty ? "(no prompt)" : entry.firstPrompt,
+                    color: .primary
+                )
+
+                // Last user prompt (only if different from first)
+                if !entry.lastPrompt.isEmpty && entry.lastPrompt != entry.firstPrompt {
+                    previewLine(
+                        icon: "bubble.right.fill",
+                        text: entry.lastPrompt,
+                        color: .primary.opacity(0.7)
+                    )
+                }
+
+                // Last assistant output
+                if !entry.lastOutput.isEmpty {
+                    previewLine(
+                        icon: "sparkles",
+                        text: entry.lastOutput,
+                        color: .secondary
+                    )
+                }
+            }
 
             // Bottom line: metadata badges
             HStack(spacing: 6) {
@@ -67,6 +89,19 @@ struct SessionRowView: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    private func previewLine(icon: String, text: String, color: some ShapeStyle) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 8))
+                .foregroundStyle(.tertiary)
+                .frame(width: 10)
+            Text(text)
+                .font(.caption)
+                .lineLimit(1)
+                .foregroundStyle(color)
+        }
     }
 
     private func metaBadge(text: String, icon: String? = nil, color: Color) -> some View {

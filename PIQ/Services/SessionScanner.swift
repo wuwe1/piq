@@ -71,6 +71,8 @@ enum SessionScanner {
                     projectPath: best.projectPath,
                     projectName: best.projectName,
                     firstPrompt: best.firstPrompt,
+                    lastPrompt: latest.lastPrompt.isEmpty ? best.lastPrompt : latest.lastPrompt,
+                    lastOutput: latest.lastOutput.isEmpty ? best.lastOutput : latest.lastOutput,
                     userTurnCount: group.reduce(0) { $0 + $1.userTurnCount },
                     messageCount: group.reduce(0) { $0 + $1.messageCount },
                     model: latest.model.isEmpty ? best.model : latest.model,

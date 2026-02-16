@@ -186,7 +186,7 @@ final class SessionStore {
 
                 if let entry = detailEntry {
                     Task {
-                        await self.loadSessionDetail(entry: entry)
+                        await self.loadSessionDetail(entry: entry, isRefresh: true)
                     }
                 }
             }
@@ -292,10 +292,13 @@ final class SessionStore {
     // MARK: - Detail Loading
 
     /// Load full session detail (turns) for display.
-    func loadSessionDetail(entry: SessionEntry) async {
+    /// When `isRefresh` is true, keeps existing turns visible to preserve scroll position.
+    func loadSessionDetail(entry: SessionEntry, isRefresh: Bool = false) async {
         loadedSessionId = entry.id
-        isLoadingDetail = true
-        loadedTurns = []
+        if !isRefresh {
+            isLoadingDetail = true
+            loadedTurns = []
+        }
 
         let url = entry.jsonlURL
         let sessionId = entry.id

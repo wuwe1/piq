@@ -6,6 +6,8 @@ struct SessionEntry: Identifiable, Equatable, Sendable, Codable {
     let projectPath: String     // from cwd field
     let projectName: String     // last component of path
     let firstPrompt: String     // first user text (truncated)
+    let lastPrompt: String      // last user text (truncated)
+    let lastOutput: String      // last assistant text output (truncated)
     let userTurnCount: Int      // real user turns (text input, not tool_result-only)
     let messageCount: Int       // user + assistant lines
     let model: String           // e.g. "claude-opus-4-6"

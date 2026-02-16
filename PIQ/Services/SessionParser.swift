@@ -18,6 +18,8 @@ enum SessionParser {
         var slug: String = ""
         var model: String = ""
         var firstPrompt: String = ""
+        var lastPrompt: String = ""
+        var lastOutput: String = ""
         var createdAt: Date?
         var lastActivityAt: Date?
         var hasSubagents = false
@@ -84,12 +86,24 @@ enum SessionParser {
                 model = m
             }
 
-            // Extract first user prompt (skip tool_result-only and interruption marker messages)
+            // Extract user prompts (skip tool_result-only and interruption marker messages)
             if lineType == "user",
                let msg = json["message"] as? [String: Any] {
                 let text = extractUserText(from: msg)
-                if firstPrompt.isEmpty && !text.hasPrefix("[Request interrupted") {
-                    firstPrompt = text
+                if !text.isEmpty && !text.hasPrefix("[Request interrupted") {
+                    if firstPrompt.isEmpty {
+                        firstPrompt = text
+                    }
+                    lastPrompt = text
+                }
+            }
+
+            // Extract last assistant text output
+            if lineType == "assistant",
+               let msg = json["message"] as? [String: Any] {
+                let text = extractAssistantText(from: msg)
+                if !text.isEmpty {
+                    lastOutput = text
                 }
             }
 
@@ -124,6 +138,8 @@ enum SessionParser {
             projectPath: projectPath,
             projectName: projectName,
             firstPrompt: firstPrompt,
+            lastPrompt: lastPrompt,
+            lastOutput: lastOutput,
             userTurnCount: userTurnCount,
             messageCount: userCount + assistantCount,
             model: model,
@@ -497,6 +513,26 @@ enum SessionParser {
             return blocks.contains { ($0["type"] as? String) == "text" }
         }
         return false
+    }
+
+    /// Extract the last text block from an assistant message's content field.
+    private static func extractAssistantText(from message: [String: Any]) -> String {
+        guard let blocks = message["content"] as? [[String: Any]] else { return "" }
+        // Find the last text block (skip thinking, tool_use)
+        var lastText: String?
+        for block in blocks {
+            if (block["type"] as? String) == "text",
+               let text = block["text"] as? String, !text.isEmpty {
+                lastText = text
+            }
+        }
+        guard let raw = lastText else { return "" }
+        let cleaned = raw
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        return String(cleaned.prefix(200))
     }
 
     /// Extract human-readable text from a user message's content field.
