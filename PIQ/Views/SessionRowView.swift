@@ -3,6 +3,7 @@ import SwiftUI
 /// A single row in the session list sidebar.
 struct SessionRowView: View {
     let entry: SessionEntry
+    var unreadCount: Int = 0
 
     private static let relativeFormatter: RelativeDateTimeFormatter = {
         let f = RelativeDateTimeFormatter()
@@ -19,6 +20,14 @@ struct SessionRowView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 Spacer()
+                if unreadCount > 0 {
+                    Text(unreadCount > 99 ? "99+" : "\(unreadCount)")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(.red, in: Capsule())
+                }
                 Text(Self.relativeFormatter.localizedString(for: entry.lastActivityAt, relativeTo: Date()))
                     .font(.caption2)
                     .foregroundStyle(.tertiary)

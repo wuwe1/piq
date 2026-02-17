@@ -87,7 +87,8 @@ enum ScreenshotMockData {
                 jsonlURL: URL(filePath: "/tmp/s1.jsonl"),
                 hasSubagents: true,
                 inputTokens: 245_000, outputTokens: 89_000,
-                cacheReadTokens: 180_000, cacheCreationTokens: 12_000
+                cacheReadTokens: 180_000, cacheCreationTokens: 12_000,
+                readableMessageCount: 42
             ),
             SessionEntry(
                 id: "s2", sessionId: "s2",
@@ -104,7 +105,8 @@ enum ScreenshotMockData {
                 jsonlURL: URL(filePath: "/tmp/s2.jsonl"),
                 hasSubagents: false,
                 inputTokens: 52_000, outputTokens: 18_000,
-                cacheReadTokens: 38_000, cacheCreationTokens: 4_000
+                cacheReadTokens: 38_000, cacheCreationTokens: 4_000,
+                readableMessageCount: 15
             ),
             SessionEntry(
                 id: "s3", sessionId: "s3",
@@ -121,7 +123,8 @@ enum ScreenshotMockData {
                 jsonlURL: URL(filePath: "/tmp/s3.jsonl"),
                 hasSubagents: true,
                 inputTokens: 420_000, outputTokens: 156_000,
-                cacheReadTokens: 310_000, cacheCreationTokens: 22_000
+                cacheReadTokens: 310_000, cacheCreationTokens: 22_000,
+                readableMessageCount: 68
             ),
             SessionEntry(
                 id: "s4", sessionId: "s4",
@@ -138,7 +141,8 @@ enum ScreenshotMockData {
                 jsonlURL: URL(filePath: "/tmp/s4.jsonl"),
                 hasSubagents: false,
                 inputTokens: 28_000, outputTokens: 12_000,
-                cacheReadTokens: 20_000, cacheCreationTokens: 2_000
+                cacheReadTokens: 20_000, cacheCreationTokens: 2_000,
+                readableMessageCount: 22
             ),
             SessionEntry(
                 id: "s5", sessionId: "s5",
@@ -155,7 +159,8 @@ enum ScreenshotMockData {
                 jsonlURL: URL(filePath: "/tmp/s5.jsonl"),
                 hasSubagents: false,
                 inputTokens: 185_000, outputTokens: 67_000,
-                cacheReadTokens: 140_000, cacheCreationTokens: 9_000
+                cacheReadTokens: 140_000, cacheCreationTokens: 9_000,
+                readableMessageCount: 30
             ),
         ]
     }

@@ -199,7 +199,7 @@ struct SessionWindowView: View {
                                 .padding(.vertical, 8)
                         } else {
                             ForEach(displaySessions) { session in
-                                SessionRowView(entry: session)
+                                SessionRowView(entry: session, unreadCount: sessionStore?.unreadCounts[session.id] ?? 0)
                                     .tag(SidebarSelection.session(session.id))
                             }
                         }

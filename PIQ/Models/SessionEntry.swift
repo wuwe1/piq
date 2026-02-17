@@ -22,6 +22,7 @@ struct SessionEntry: Identifiable, Equatable, Sendable, Codable {
     let outputTokens: Int       // sum of output_tokens from all assistant messages
     let cacheReadTokens: Int    // sum of cache_read_input_tokens
     let cacheCreationTokens: Int // sum of cache_creation_input_tokens
+    let readableMessageCount: Int // assistant text + tool_result count
 
     /// If this is a continuation, returns the parent file's UUID.
     var parentFileId: String? { sessionId != id ? sessionId : nil }

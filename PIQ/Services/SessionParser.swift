@@ -31,6 +31,7 @@ enum SessionParser {
         var outputTokens = 0
         var cacheReadTokens = 0
         var cacheCreationTokens = 0
+        var readableMessageCount = 0
 
         for lineData in allLines {
             guard let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any] else { continue }
@@ -84,6 +85,22 @@ enum SessionParser {
                     cacheReadTokens += usage["cache_read_input_tokens"] as? Int ?? 0
                     cacheCreationTokens += usage["cache_creation_input_tokens"] as? Int ?? 0
                 }
+            }
+
+            // Count readable messages: assistant with non-empty text
+            if lineType == "assistant",
+               let msg = json["message"] as? [String: Any],
+               let blocks = msg["content"] as? [[String: Any]] {
+                if blocks.contains(where: { ($0["type"] as? String) == "text" && !($0["text"] as? String ?? "").isEmpty }) {
+                    readableMessageCount += 1
+                }
+            }
+
+            // Count readable messages: user with tool_result blocks
+            if lineType == "user",
+               let msg = json["message"] as? [String: Any],
+               let blocks = msg["content"] as? [[String: Any]] {
+                readableMessageCount += blocks.filter { ($0["type"] as? String) == "tool_result" }.count
             }
 
             // Extract model from assistant message (skip synthetic placeholder)
@@ -163,7 +180,8 @@ enum SessionParser {
             inputTokens: inputTokens,
             outputTokens: outputTokens,
             cacheReadTokens: cacheReadTokens,
-            cacheCreationTokens: cacheCreationTokens
+            cacheCreationTokens: cacheCreationTokens,
+            readableMessageCount: readableMessageCount
         )
     }
 

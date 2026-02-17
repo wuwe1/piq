@@ -214,7 +214,7 @@ struct MenuBarView: View {
             NSApp.activate(ignoringOtherApps: true)
             openWindow(id: "main")
         } label: {
-            SessionRowView(entry: session)
+            SessionRowView(entry: session, unreadCount: sessionStore?.unreadCounts[session.id] ?? 0)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .contentShape(Rectangle())

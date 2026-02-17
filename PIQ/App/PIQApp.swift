@@ -14,10 +14,13 @@ struct PIQApp: App {
         }
         .defaultSize(width: 1000, height: 700)
 
-        MenuBarExtra("PIQ", systemImage: "eyes") {
+        MenuBarExtra {
             MenuBarView()
                 .environment(appState)
                 .frame(width: 360, height: 500)
+        } label: {
+            let total = appState.sessionStore?.unreadCounts.values.reduce(0, +) ?? 0
+            Label(total > 0 ? "\(total)" : "", systemImage: "eyes")
         }
         .menuBarExtraStyle(.window)
     }

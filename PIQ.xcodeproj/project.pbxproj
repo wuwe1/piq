@@ -30,6 +30,7 @@
 		A1000063 /* SessionToolCallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000063 /* SessionToolCallView.swift */; };
 		A1000064 /* StatsOverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000064 /* StatsOverviewView.swift */; };
 		A1000065 /* MarkdownTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000065 /* MarkdownTextView.swift */; };
+		A1000066 /* ReadState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000066 /* ReadState.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -69,6 +70,7 @@
 		A2000065 /* MarkdownTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownTextView.swift; sourceTree = "<group>"; };
 		A2000070 /* ScreenshotGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotGenerator.swift; sourceTree = "<group>"; };
 		A2000080 /* ScreenshotGenerationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotGenerationTests.swift; sourceTree = "<group>"; };
+		A2000066 /* ReadState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadState.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -144,6 +146,7 @@
 				A2000050 /* SessionEntry.swift */,
 				A2000051 /* SessionMessage.swift */,
 				A2000052 /* SessionTurn.swift */,
+				A2000066 /* ReadState.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -305,6 +308,7 @@
 				A1000064 /* StatsOverviewView.swift in Sources */,
 				A1000065 /* MarkdownTextView.swift in Sources */,
 				A1000070 /* ScreenshotGenerator.swift in Sources */,
+				A1000066 /* ReadState.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

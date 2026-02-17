@@ -180,6 +180,8 @@ final class SessionStore {
     private(set) var statsCache: StatsCache?
     private var fileWatcher: SessionFileWatcher?
     private var sessionIndex = SessionIndex()
+    private var readState = ReadState.load()
+    private(set) var unreadCounts: [String: Int] = [:]
 
     /// Currently loaded session detail (turns for the selected session).
     private(set) var loadedTurns: [SessionTurn] = []
@@ -235,6 +237,13 @@ final class SessionStore {
                 self.statsCache = cache
                 self.scanProgress = nil
                 self.isLoading = false
+
+                // First launch: mark all as read to avoid showing everything as unread
+                if self.readState.lastReadCounts.isEmpty {
+                    self.markAllAsRead()
+                }
+                self.readState.removeStaleEntries(keeping: Set(sorted.map(\.id)))
+                self.recomputeUnreadCounts()
             }
         }
     }
@@ -268,6 +277,7 @@ final class SessionStore {
                 self.sessionIndex = result.updatedIndex
                 self.stats = newStats
                 self.statsCache = cache
+                self.recomputeUnreadCounts()
 
                 if let entry = detailEntry {
                     Task {
@@ -385,6 +395,11 @@ final class SessionStore {
             loadedTurns = []
         }
 
+        // Mark session as read
+        readState.markRead(sessionId: entry.id, readableMessageCount: entry.readableMessageCount)
+        readState.save()
+        recomputeUnreadCounts()
+
         let url = entry.jsonlURL
         let sessionId = entry.sessionId
         let turns = await Task.detached(priority: .userInitiated) {
@@ -425,6 +440,26 @@ final class SessionStore {
         loadedTurns = []
         loadedSessionId = nil
         isLoadingDetail = false
+    }
+
+    // MARK: - Unread Tracking
+
+    private func recomputeUnreadCounts() {
+        var counts: [String: Int] = [:]
+        for session in sessions {
+            let count = readState.unreadCount(sessionId: session.id, readableMessageCount: session.readableMessageCount)
+            if count > 0 {
+                counts[session.id] = count
+            }
+        }
+        unreadCounts = counts
+    }
+
+    private func markAllAsRead() {
+        for session in sessions {
+            readState.markRead(sessionId: session.id, readableMessageCount: session.readableMessageCount)
+        }
+        readState.save()
     }
 
     // MARK: - Aggregate Stats
