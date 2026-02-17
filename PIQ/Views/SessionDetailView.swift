@@ -279,6 +279,7 @@ struct SessionDetailView: View {
                 }
                 .padding(16)
             }
+            .defaultScrollAnchor(.bottom)
             .onChange(of: scrollTarget) { _, target in
                 guard let target else { return }
                 withAnimation(.easeInOut(duration: 0.3)) {
