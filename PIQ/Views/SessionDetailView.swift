@@ -308,64 +308,91 @@ struct SessionDetailView: View {
             Divider()
 
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
+                LazyVStack(alignment: .leading, spacing: 1) {
                     ForEach(userTurns, id: \.turn.id) { item in
                         inspectorRow(item)
+                        if item.turn.id != userTurns.last?.turn.id {
+                            Divider().padding(.leading, 44)
+                        }
                     }
                 }
+                .padding(.vertical, 4)
             }
         }
     }
 
+    @State private var hoveredTurnId: String?
+
+    private var isSystemMessage: (String) -> Bool {{ text in
+        text.hasPrefix("This session is being continued") ||
+        text.hasPrefix("<task-notification>") ||
+        text.hasPrefix("Base directory for this skill:")
+    }}
+
     private func inspectorRow(_ item: (index: Int, turn: SessionTurn, text: String)) -> some View {
-        Button {
+        let isSystem = isSystemMessage(item.text)
+        let isSelected = scrollTarget == item.turn.id
+        let isHovered = hoveredTurnId == item.turn.id
+
+        return Button {
             scrollTarget = item.turn.id
         } label: {
             HStack(alignment: .top, spacing: 8) {
                 Text("\(item.index)")
-                    .font(.caption2)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 20, alignment: .trailing)
+                    .font(.system(.caption2, design: .rounded))
+                    .fontWeight(.semibold)
+                    .foregroundStyle(isSelected ? .white : .secondary)
+                    .frame(width: 24, height: 24)
+                    .background(
+                        isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.quaternary),
+                        in: Circle()
+                    )
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text(item.text.prefix(120))
                         .font(.caption)
-                        .foregroundStyle(.primary)
-                        .lineLimit(3)
+                        .foregroundStyle(isSystem ? .secondary : .primary)
+                        .italic(isSystem)
+                        .lineLimit(2)
                         .multilineTextAlignment(.leading)
 
                     inspectorRowMeta(item.turn)
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 10)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .background {
-            if scrollTarget == item.turn.id {
-                Color.accentColor.opacity(0.1)
-            }
-        }
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(isSelected ? AnyShapeStyle(Color.accentColor.opacity(0.12)) : isHovered ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear))
+                .padding(.horizontal, 4)
+        )
+        .onHover { hovering in hoveredTurnId = hovering ? item.turn.id : nil }
     }
 
     private func inspectorRowMeta(_ turn: SessionTurn) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             if let ts = turn.userMessage?.timestamp {
                 Text(ts, format: .dateTime.hour().minute().second())
+                    .foregroundStyle(.secondary)
             }
+
+            Spacer()
+
             let toolCount = turn.toolPairs.count
             if toolCount > 0 {
                 Label("\(toolCount)", systemImage: "wrench")
+                    .foregroundStyle(.blue.opacity(0.7))
             }
             if let usage = turn.totalUsage {
-                Text("\(formatCompact(usage.outputTokens)) out")
+                Label("\(formatCompact(usage.inputTokens))/\(formatCompact(usage.outputTokens))", systemImage: "sparkle")
+                    .foregroundStyle(.green.opacity(0.7))
             }
         }
         .font(.caption2)
-        .foregroundStyle(.tertiary)
     }
 
     private func formatCompact(_ count: Int) -> String {

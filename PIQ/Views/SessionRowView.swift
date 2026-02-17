@@ -73,7 +73,7 @@ struct SessionRowView: View {
                 }
                 if entry.outputTokens > 0 {
                     metaBadge(
-                        text: (entry.inputTokens + entry.outputTokens).formattedCount,
+                        text: "\(entry.inputTokens.formattedCount)/\(entry.outputTokens.formattedCount)",
                         icon: "sparkle",
                         color: .green
                     )
