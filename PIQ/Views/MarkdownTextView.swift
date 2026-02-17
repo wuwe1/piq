@@ -37,7 +37,19 @@ struct MarkdownTextView: View {
         enum Alignment { case leading, center, trailing }
     }
 
+    private nonisolated(unsafe) static let segmentCache = NSCache<NSNumber, SegmentBox>()
+
+    private final class SegmentBox { let segments: [Segment]; init(_ s: [Segment]) { segments = s } }
+
     private var segments: [Segment] {
+        let key = NSNumber(value: text.hashValue)
+        if let cached = Self.segmentCache.object(forKey: key) { return cached.segments }
+        let result = Self.parseSegments(text)
+        Self.segmentCache.setObject(SegmentBox(result), forKey: key)
+        return result
+    }
+
+    private static func parseSegments(_ text: String) -> [Segment] {
         var result: [Segment] = []
         var current = ""
         var inCode = false
@@ -111,12 +123,12 @@ struct MarkdownTextView: View {
         return result
     }
 
-    private func isTableLine(_ line: String) -> Bool {
+    private static func isTableLine(_ line: String) -> Bool {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         return trimmed.hasPrefix("|") && trimmed.hasSuffix("|") && trimmed.count > 1
     }
 
-    private func parseTable(_ lines: [String]) -> ParsedTable? {
+    private static func parseTable(_ lines: [String]) -> ParsedTable? {
         guard lines.count >= 2 else { return nil }
 
         func splitRow(_ line: String) -> [String] {

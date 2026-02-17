@@ -30,12 +30,17 @@ struct SessionToolCallView: View {
         }
     }
 
-    /// Parsed JSON input for structured display.
+    /// Parsed JSON input for structured display (cached).
+    private nonisolated(unsafe) static let jsonCache = NSCache<NSString, JsonBox>()
+    private final class JsonBox { let json: [String: Any]?; init(_ j: [String: Any]?) { json = j } }
+
     private var parsedInput: [String: Any]? {
-        guard let data = pair.inputJSON.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return nil
+        let key = pair.inputJSON as NSString
+        if let cached = Self.jsonCache.object(forKey: key) { return cached.json }
+        let json = pair.inputJSON.data(using: .utf8).flatMap {
+            try? JSONSerialization.jsonObject(with: $0) as? [String: Any]
         }
+        Self.jsonCache.setObject(JsonBox(json), forKey: key)
         return json
     }
 
@@ -199,7 +204,7 @@ struct SessionToolCallView: View {
         let filePath = input["file_path"] as? String ?? ""
         let oldStr = input["old_string"] as? String ?? ""
         let newStr = input["new_string"] as? String ?? ""
-        let lines = Self.computeLineDiff(old: oldStr, new: newStr)
+        let lines = Self.cachedLineDiff(old: oldStr, new: newStr)
 
         return VStack(alignment: .leading, spacing: 0) {
             if !filePath.isEmpty { filePathHeader(filePath) }
@@ -681,6 +686,17 @@ struct SessionToolCallView: View {
     }
 
     // MARK: - Diff Types & Computation
+
+    private nonisolated(unsafe) static let diffCache = NSCache<NSNumber, DiffResultBox>()
+    private final class DiffResultBox { let lines: [DiffDisplayLine]; init(_ l: [DiffDisplayLine]) { lines = l } }
+
+    private static func cachedLineDiff(old: String, new: String) -> [DiffDisplayLine] {
+        let key = NSNumber(value: "\(old)\n---\n\(new)".hashValue)
+        if let cached = diffCache.object(forKey: key) { return cached.lines }
+        let result = computeLineDiff(old: old, new: new)
+        diffCache.setObject(DiffResultBox(result), forKey: key)
+        return result
+    }
 
     private enum DiffLineType { case context, removed, added }
 

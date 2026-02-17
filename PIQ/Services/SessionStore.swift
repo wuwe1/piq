@@ -39,6 +39,18 @@ struct ModelStats: Identifiable, Sendable {
     }
 }
 
+struct ProjectGroup: Sendable {
+    let name: String
+    let path: String
+    let count: Int
+    let tokens: Int
+}
+
+struct HourlyBucket: Sendable {
+    let date: Date
+    let count: Int
+}
+
 struct ClaudeStats: Sendable {
     let totalSessions: Int
     let totalMessages: Int
@@ -53,6 +65,8 @@ struct ClaudeStats: Sendable {
     let hourCounts: [Int: Int]
     let dailyActivity: [DailyActivity]
     let modelBreakdown: [ModelStats]
+    let projectGroups: [ProjectGroup]
+    let recentHourly: [HourlyBucket]
 
     /// Actual API tokens (excluding cache)
     var totalTokens: Int { totalInputTokens + totalOutputTokens }
@@ -464,50 +478,77 @@ final class SessionStore {
 
     // MARK: - Aggregate Stats
 
-    /// Compute aggregate stats from parsed session data.
+    /// Compute aggregate stats from parsed session data in a single pass.
     private nonisolated static func computeStats(from sessions: [SessionEntry]) -> ClaudeStats {
-        let totalMessages = sessions.reduce(0) { $0 + $1.messageCount }
-        let totalInput = sessions.reduce(0) { $0 + $1.inputTokens }
-        let totalOutput = sessions.reduce(0) { $0 + $1.outputTokens }
-
-        let firstDate = sessions.min(by: { $0.createdAt < $1.createdAt })?.createdAt
-        let longestMsgs = sessions.max(by: { $0.messageCount < $1.messageCount })?.messageCount ?? 0
-        let longestDuration = sessions.reduce(0.0) {
-            max($0, $1.lastActivityAt.timeIntervalSince($1.createdAt))
-        }
-
-        // Hour counts — messages in the last 24 hours, distributed across active hours
         let calendar = Calendar.current
         let cutoff = Date().addingTimeInterval(-24 * 3600)
-        var hourCounts: [Int: Int] = [:]
-        for s in sessions where s.lastActivityAt > cutoff {
-            let startHour = calendar.component(.hour, from: max(s.createdAt, cutoff))
-            let endHour = calendar.component(.hour, from: s.lastActivityAt)
-            if startHour == endHour {
-                hourCounts[endHour, default: 0] += s.messageCount
-            } else {
-                // Distribute messages across active hours
-                var hours: [Int] = []
-                var h = startHour
-                while true {
-                    hours.append(h)
-                    if h == endHour { break }
-                    h = (h + 1) % 24
-                }
-                let perHour = s.messageCount / hours.count
-                let remainder = s.messageCount % hours.count
-                for (i, hour) in hours.enumerated() {
-                    hourCounts[hour, default: 0] += perHour + (i < remainder ? 1 : 0)
-                }
-            }
-        }
-
-        // Daily activity — messages distributed across active days
         let df = DateFormatter()
         df.dateFormat = "yyyy-MM-dd"
         df.locale = Locale(identifier: "en_US_POSIX")
+
+        var totalMessages = 0
+        var totalInput = 0
+        var totalOutput = 0
+        var totalCacheRead = 0
+        var totalCacheCreate = 0
+        var firstDate: Date?
+        var longestMsgs = 0
+        var longestDuration: TimeInterval = 0
+        var hourCounts: [Int: Int] = [:]
         var daily: [String: Int] = [:]
+        var models: [String: (inp: Int, out: Int, cacheRead: Int, cacheCreate: Int)] = [:]
+        var projectMap: [String: (name: String, count: Int, tokens: Int)] = [:]
+
+        // Recent hourly buckets (24h)
+        let currentHour = calendar.dateInterval(of: .hour, for: Date())!.start
+        let startHour = currentHour.addingTimeInterval(-23 * 3600)
+        var hourlyBuckets: [Date: Int] = [:]
+        for i in 0..<24 {
+            hourlyBuckets[startHour.addingTimeInterval(Double(i) * 3600)] = 0
+        }
+
         for s in sessions {
+            // Basic aggregates
+            totalMessages += s.messageCount
+            totalInput += s.inputTokens
+            totalOutput += s.outputTokens
+            totalCacheRead += s.cacheReadTokens
+            totalCacheCreate += s.cacheCreationTokens
+
+            if firstDate == nil || s.createdAt < firstDate! {
+                firstDate = s.createdAt
+            }
+            if s.messageCount > longestMsgs {
+                longestMsgs = s.messageCount
+            }
+            let duration = s.lastActivityAt.timeIntervalSince(s.createdAt)
+            if duration > longestDuration {
+                longestDuration = duration
+            }
+
+            // Hour counts (last 24h)
+            if s.lastActivityAt > cutoff {
+                let sHour = calendar.component(.hour, from: max(s.createdAt, cutoff))
+                let eHour = calendar.component(.hour, from: s.lastActivityAt)
+                if sHour == eHour {
+                    hourCounts[eHour, default: 0] += s.messageCount
+                } else {
+                    var hours: [Int] = []
+                    var h = sHour
+                    while true {
+                        hours.append(h)
+                        if h == eHour { break }
+                        h = (h + 1) % 24
+                    }
+                    let perHour = s.messageCount / hours.count
+                    let remainder = s.messageCount % hours.count
+                    for (i, hour) in hours.enumerated() {
+                        hourCounts[hour, default: 0] += perHour + (i < remainder ? 1 : 0)
+                    }
+                }
+            }
+
+            // Daily activity
             let startDay = calendar.startOfDay(for: s.createdAt)
             let endDay = calendar.startOfDay(for: s.lastActivityAt)
             if startDay == endDay {
@@ -525,21 +566,52 @@ final class SessionStore {
                     daily[day, default: 0] += perDay + (i < remainder ? 1 : 0)
                 }
             }
+
+            // Model breakdown
+            if !s.model.isEmpty {
+                let e = models[s.model] ?? (0, 0, 0, 0)
+                models[s.model] = (
+                    inp: e.inp + s.inputTokens,
+                    out: e.out + s.outputTokens,
+                    cacheRead: e.cacheRead + s.cacheReadTokens,
+                    cacheCreate: e.cacheCreate + s.cacheCreationTokens
+                )
+            }
+
+            // Project groups
+            let key = s.projectPath.isEmpty ? "(unknown)" : s.projectPath
+            let name = s.projectPath.isEmpty ? "Unknown" : s.projectName
+            let existing = projectMap[key] ?? (name: name, count: 0, tokens: 0)
+            projectMap[key] = (
+                name: existing.name,
+                count: existing.count + 1,
+                tokens: existing.tokens + s.inputTokens + s.outputTokens
+            )
+
+            // Recent hourly buckets
+            let endBucket = calendar.dateInterval(of: .hour, for: s.lastActivityAt)?.start ?? s.lastActivityAt
+            if endBucket >= startHour {
+                let clippedStart = max(s.createdAt, startHour)
+                let startBucket = calendar.dateInterval(of: .hour, for: clippedStart)?.start ?? clippedStart
+                var validBuckets: [Date] = []
+                var hb = startBucket
+                while hb <= endBucket {
+                    if hourlyBuckets[hb] != nil { validBuckets.append(hb) }
+                    hb = hb.addingTimeInterval(3600)
+                }
+                if !validBuckets.isEmpty {
+                    let perBucket = s.messageCount / validBuckets.count
+                    let remainder = s.messageCount % validBuckets.count
+                    for (i, bucket) in validBuckets.enumerated() {
+                        hourlyBuckets[bucket, default: 0] += perBucket + (i < remainder ? 1 : 0)
+                    }
+                }
+            }
         }
+
         let dailyActivity = daily.map { DailyActivity(date: $0.key, messageCount: $0.value) }
             .sorted { $0.date < $1.date }
 
-        // Model breakdown
-        var models: [String: (inp: Int, out: Int, cacheRead: Int, cacheCreate: Int)] = [:]
-        for s in sessions where !s.model.isEmpty {
-            let e = models[s.model] ?? (0, 0, 0, 0)
-            models[s.model] = (
-                inp: e.inp + s.inputTokens,
-                out: e.out + s.outputTokens,
-                cacheRead: e.cacheRead + s.cacheReadTokens,
-                cacheCreate: e.cacheCreate + s.cacheCreationTokens
-            )
-        }
         let modelBreakdown = models.map {
             ModelStats(
                 model: $0.key,
@@ -551,8 +623,12 @@ final class SessionStore {
             )
         }.sorted { $0.estimatedCost > $1.estimatedCost }
 
-        let totalCacheRead = sessions.reduce(0) { $0 + $1.cacheReadTokens }
-        let totalCacheCreate = sessions.reduce(0) { $0 + $1.cacheCreationTokens }
+        let projectGroups = projectMap.map {
+            ProjectGroup(name: $0.value.name, path: $0.key, count: $0.value.count, tokens: $0.value.tokens)
+        }.sorted { $0.count > $1.count }
+
+        let recentHourly = hourlyBuckets.sorted { $0.key < $1.key }
+            .map { HourlyBucket(date: $0.key, count: $0.value) }
 
         return ClaudeStats(
             totalSessions: sessions.count,
@@ -566,7 +642,9 @@ final class SessionStore {
             longestSessionDuration: longestDuration,
             hourCounts: hourCounts,
             dailyActivity: dailyActivity,
-            modelBreakdown: modelBreakdown
+            modelBreakdown: modelBreakdown,
+            projectGroups: projectGroups,
+            recentHourly: recentHourly
         )
     }
 

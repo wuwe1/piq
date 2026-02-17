@@ -5,8 +5,6 @@ struct StatsOverviewView: View {
     let stats: ClaudeStats
     let sessions: [SessionEntry]
     let statsCache: StatsCache?
-    let projectGroups: [(name: String, path: String, count: Int, tokens: Int)]
-    let recentHourly: [(date: Date, count: Int)]
 
     @State private var selectedDay: Date?
     @State private var selectedModelDay: Date?
@@ -16,56 +14,6 @@ struct StatsOverviewView: View {
         self.stats = stats
         self.sessions = sessions
         self.statsCache = statsCache
-
-        var groups: [String: (name: String, count: Int, tokens: Int)] = [:]
-        for session in sessions {
-            let key = session.projectPath.isEmpty ? "(unknown)" : session.projectPath
-            let name = session.projectPath.isEmpty ? "Unknown" : session.projectName
-            let existing = groups[key] ?? (name: name, count: 0, tokens: 0)
-            groups[key] = (
-                name: existing.name,
-                count: existing.count + 1,
-                tokens: existing.tokens + session.inputTokens + session.outputTokens
-            )
-        }
-        self.projectGroups = groups.map {
-            (name: $0.value.name, path: $0.key, count: $0.value.count, tokens: $0.value.tokens)
-        }.sorted { $0.count > $1.count }
-
-        // Build 24-hour timeline ending at the current hour
-        let calendar = Calendar.current
-        let currentHour = calendar.dateInterval(of: .hour, for: Date())!.start
-        let startHour = currentHour.addingTimeInterval(-23 * 3600)
-
-        var buckets: [Date: Int] = [:]
-        for i in 0..<24 {
-            buckets[startHour.addingTimeInterval(Double(i) * 3600)] = 0
-        }
-        for s in sessions {
-            let endBucket = calendar.dateInterval(of: .hour, for: s.lastActivityAt)?.start ?? s.lastActivityAt
-            guard endBucket >= startHour else { continue }
-
-            let clippedStart = max(s.createdAt, startHour)
-            let startBucket = calendar.dateInterval(of: .hour, for: clippedStart)?.start ?? clippedStart
-
-            // Collect valid hour buckets this session spans
-            var validBuckets: [Date] = []
-            var h = startBucket
-            while h <= endBucket {
-                if buckets[h] != nil { validBuckets.append(h) }
-                h = h.addingTimeInterval(3600)
-            }
-            guard !validBuckets.isEmpty else { continue }
-
-            // Distribute messages evenly across active hours
-            let perBucket = s.messageCount / validBuckets.count
-            let remainder = s.messageCount % validBuckets.count
-            for (i, bucket) in validBuckets.enumerated() {
-                buckets[bucket, default: 0] += perBucket + (i < remainder ? 1 : 0)
-            }
-        }
-        self.recentHourly = buckets.sorted { $0.key < $1.key }
-            .map { (date: $0.key, count: $0.value) }
     }
 
     private var daysSinceFirst: Int {
@@ -110,7 +58,7 @@ struct StatsOverviewView: View {
             )
             StatCard(
                 icon: "folder",
-                value: "\(projectGroups.count)",
+                value: "\(stats.projectGroups.count)",
                 label: "Projects",
                 color: .indigo
             )
@@ -292,7 +240,7 @@ struct StatsOverviewView: View {
                 .foregroundStyle(.secondary)
 
             Chart {
-                ForEach(recentHourly, id: \.date) { item in
+                ForEach(stats.recentHourly, id: \.date) { item in
                     BarMark(
                         x: .value("Time", item.date, unit: .hour),
                         y: .value("Messages", item.count)
@@ -404,7 +352,7 @@ struct StatsOverviewView: View {
                 .foregroundStyle(.secondary)
 
             VStack(spacing: 0) {
-                ForEach(projectGroups, id: \.path) { project in
+                ForEach(stats.projectGroups, id: \.path) { project in
                     HStack {
                         Image(systemName: "folder")
                             .foregroundStyle(.secondary)
@@ -424,7 +372,7 @@ struct StatsOverviewView: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
 
-                    if project.path != projectGroups.last?.path {
+                    if project.path != stats.projectGroups.last?.path {
                         Divider().padding(.leading, 32)
                     }
                 }
@@ -485,9 +433,9 @@ struct StatsOverviewView: View {
         return (date: cal.startOfDay(for: selected), total: total)
     }
 
-    private func matchingHourly(for date: Date) -> (date: Date, count: Int)? {
+    private func matchingHourly(for date: Date) -> HourlyBucket? {
         guard let hour = Calendar.current.dateInterval(of: .hour, for: date)?.start else { return nil }
-        return recentHourly.first { $0.date == hour }
+        return stats.recentHourly.first { $0.date == hour }
     }
 
     private func parseDate(_ string: String) -> Date? {

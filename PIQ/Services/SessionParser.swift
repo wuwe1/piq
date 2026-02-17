@@ -33,7 +33,14 @@ enum SessionParser {
         var cacheCreationTokens = 0
         var readableMessageCount = 0
 
+        let snapshotMarker = Data("\"file-history-snapshot\"".utf8)
         for lineData in allLines {
+            // Fast skip: file-history-snapshot lines are typically the largest in the file;
+            // avoid expensive JSON parsing by checking for the marker string first.
+            if lineData.count > 200, lineData.range(of: snapshotMarker) != nil {
+                continue
+            }
+
             guard let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any] else { continue }
 
             let lineType = json["type"] as? String ?? ""

@@ -41,21 +41,20 @@ struct SessionDetailView: View {
     @State private var expandState = ExpandState()
     @State private var showInspector = true
     @State private var scrollTarget: String?
+    @State private var userTurns: [(index: Int, turn: SessionTurn, text: String)] = []
 
     /// The child continuation session (if any) that continues from this session.
     private var childSession: SessionEntry? {
         sessions.first { $0.parentFileId == entry.id }
     }
 
-    /// Turns that have a real user message (for the inspector TOC).
-    /// Turns without an assistant response are merged into the next turn
-    /// (e.g. text + image sent together may produce two JSONL entries).
-    private var userTurns: [(index: Int, turn: SessionTurn, text: String)] {
+    /// Compute user turns from loaded turns (for the inspector TOC).
+    private static func computeUserTurns(from turns: [SessionTurn]) -> [(index: Int, turn: SessionTurn, text: String)] {
         var result: [(index: Int, turn: SessionTurn, text: String)] = []
         var idx = 0
         var pendingTexts: [String] = []
 
-        for turn in store.loadedTurns {
+        for turn in turns {
             guard let userMsg = turn.userMessage else { continue }
 
             let text = userMsg.contentBlocks.compactMap { block -> String? in
@@ -117,6 +116,9 @@ struct SessionDetailView: View {
             }
         }
         .environment(expandState)
+        .onChange(of: store.loadedTurns.count, initial: true) { _, _ in
+            userTurns = Self.computeUserTurns(from: store.loadedTurns)
+        }
         .onChange(of: entry.id) { _, _ in
             expandState.collapseAll()
             isAllExpanded = false

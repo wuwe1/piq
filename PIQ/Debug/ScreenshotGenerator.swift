@@ -208,7 +208,16 @@ enum ScreenshotMockData {
                 ModelStats(model: "claude-haiku-4-5-20251001", displayName: "Haiku 4.5",
                            inputTokens: 4_500_000, outputTokens: 1_400_000,
                            cacheReadTokens: 2_000_000, cacheCreationTokens: 280_000),
-            ]
+            ],
+            projectGroups: [
+                ProjectGroup(name: "piq", path: "/Users/demo/Developer/piq", count: 120, tokens: 15_000_000),
+                ProjectGroup(name: "website", path: "/Users/demo/Developer/website", count: 85, tokens: 8_500_000),
+                ProjectGroup(name: "api-server", path: "/Users/demo/Developer/api-server", count: 60, tokens: 6_200_000),
+            ],
+            recentHourly: (0..<24).map { i in
+                let hour = Calendar.current.dateInterval(of: .hour, for: now)!.start.addingTimeInterval(Double(i - 23) * 3600)
+                return HourlyBucket(date: hour, count: hourCounts[Calendar.current.component(.hour, from: hour)] ?? 0)
+            }
         )
     }
 
