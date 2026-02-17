@@ -218,48 +218,56 @@ struct MarkdownTextView: View {
     // MARK: - Inline Markdown
 
     private func inlineMarkdown(_ md: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            ForEach(Array(md.components(separatedBy: "\n").enumerated()), id: \.offset) { _, line in
-                if line.isEmpty {
-                    Spacer().frame(height: 4)
-                } else {
-                    lineView(line)
-                }
-            }
-        }
-        .textSelection(.enabled)
+        Text(buildAttributedMarkdown(md))
+            .textSelection(.enabled)
     }
 
-    @ViewBuilder
-    private func lineView(_ line: String) -> some View {
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
+    private func buildAttributedMarkdown(_ md: String) -> AttributedString {
+        var result = AttributedString()
+        let lines = md.components(separatedBy: "\n")
 
-        if trimmed.hasPrefix("### ") {
-            Text(styledInline(String(trimmed.dropFirst(4)), baseFont: .subheadline))
-                .padding(.top, 4)
-        } else if trimmed.hasPrefix("## ") {
-            Text(styledInline(String(trimmed.dropFirst(3)), baseFont: .headline))
-                .padding(.top, 6)
-        } else if trimmed.hasPrefix("# ") {
-            Text(styledInline(String(trimmed.dropFirst(2)), baseFont: .title3))
-                .fontWeight(.bold)
-                .padding(.top, 8)
-        } else if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text("\u{2022}")
-                    .foregroundStyle(.secondary)
-                Text(styledInline(String(trimmed.dropFirst(2))))
+        for (i, line) in lines.enumerated() {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+            if trimmed.isEmpty {
+                result.append(AttributedString("\n\n"))
+                continue
             }
-        } else if let match = trimmed.wholeMatch(of: /^(\d+)\.\s+(.+)$/) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text("\(match.1).")
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-                Text(styledInline(String(match.2)))
+
+            if i > 0 && !trimmed.isEmpty {
+                let prevTrimmed = lines[i - 1].trimmingCharacters(in: .whitespaces)
+                if !prevTrimmed.isEmpty {
+                    result.append(AttributedString("\n"))
+                }
             }
-        } else {
-            Text(styledInline(trimmed))
+
+            if trimmed.hasPrefix("### ") {
+                var seg = styledInline(String(trimmed.dropFirst(4)), baseFont: .subheadline)
+                seg.inlinePresentationIntent = .stronglyEmphasized
+                result.append(seg)
+            } else if trimmed.hasPrefix("## ") {
+                var seg = styledInline(String(trimmed.dropFirst(3)), baseFont: .headline)
+                seg.inlinePresentationIntent = .stronglyEmphasized
+                result.append(seg)
+            } else if trimmed.hasPrefix("# ") {
+                var seg = styledInline(String(trimmed.dropFirst(2)), baseFont: .title3)
+                seg.inlinePresentationIntent = .stronglyEmphasized
+                result.append(seg)
+            } else if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") {
+                var bullet = AttributedString("  \u{2022} ")
+                bullet.foregroundColor = .secondary
+                result.append(bullet)
+                result.append(styledInline(String(trimmed.dropFirst(2))))
+            } else if let match = trimmed.wholeMatch(of: /^(\d+)\.\s+(.+)$/) {
+                var num = AttributedString("  \(match.1). ")
+                num.foregroundColor = .secondary
+                result.append(num)
+                result.append(styledInline(String(match.2)))
+            } else {
+                result.append(styledInline(trimmed))
+            }
         }
+        return result
     }
 
     // MARK: - Styled Inline Attributed String
