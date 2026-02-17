@@ -179,7 +179,32 @@ struct SessionWindowView: View {
             Divider()
 
             // Session list
-            if displaySessions.isEmpty && searchText.isEmpty {
+            if sessionStore?.isLoading == true && displaySessions.isEmpty {
+                VStack(spacing: 8) {
+                    Spacer()
+                    if let p = sessionStore?.scanProgress,
+                       let completed = p.completed, let total = p.total, total > 0 {
+                        ProgressView(value: Double(completed), total: Double(total))
+                            .frame(width: 180)
+                        Text(p.message)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ProgressView()
+                        if let p = sessionStore?.scanProgress {
+                            Text(p.message)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("Loading sessions...")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
+            } else if displaySessions.isEmpty && searchText.isEmpty {
                 ContentUnavailableView {
                     Label("No Sessions", systemImage: "bubble.left.and.bubble.right")
                 } description: {
