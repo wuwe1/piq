@@ -13,16 +13,18 @@ struct SessionRowView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            // Top line: project name + time
+            // Top line: project name + badge
             HStack {
                 Text(entry.projectName)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 Spacer()
-                Text(Self.relativeFormatter.localizedString(for: entry.lastActivityAt, relativeTo: Date()))
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+            }
+            .overlay(alignment: .topTrailing) {
+                if unreadCount > 0 {
+                    unreadBadge
+                }
             }
 
             // Three preview lines
@@ -53,7 +55,7 @@ struct SessionRowView: View {
                 }
             }
 
-            // Bottom line: metadata badges
+            // Bottom line: metadata badges + time
             HStack(spacing: 6) {
                 if !entry.model.isEmpty {
                     metaBadge(text: entry.model.shortModelName, color: .purple)
@@ -87,9 +89,9 @@ struct SessionRowView: View {
                     )
                 }
                 Spacer()
-                if unreadCount > 0 {
-                    unreadBadge
-                }
+                Text(Self.relativeFormatter.localizedString(for: entry.lastActivityAt, relativeTo: Date()))
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
         }
         .padding(.vertical, 4)
@@ -112,9 +114,10 @@ struct SessionRowView: View {
         let label = unreadCount > 99 ? "99+" : "\(unreadCount)"
         let size: CGFloat = 16
         return Text(label)
-            .font(.system(size: 9, weight: .semibold, design: .rounded))
+            .font(.system(size: 9, weight: .bold, design: .rounded))
             .foregroundStyle(.white)
-            .frame(minWidth: size, minHeight: size)
+            .frame(minWidth: size, idealHeight: size)
+            .fixedSize()
             .padding(.horizontal, unreadCount > 9 ? 3 : 0)
             .background(.red.opacity(0.85), in: Capsule())
     }
