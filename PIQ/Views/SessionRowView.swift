@@ -1,15 +1,16 @@
+import Combine
 import SwiftUI
+
+/// Shared timer that fires every 60s to refresh relative timestamps.
+private nonisolated(unsafe) let relativeTimeTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
 /// A single row in the session list sidebar.
 struct SessionRowView: View {
     let entry: SessionEntry
     var unreadCount: Int = 0
+    var isSelected: Bool = false
 
-    private static let relativeFormatter: RelativeDateTimeFormatter = {
-        let f = RelativeDateTimeFormatter()
-        f.unitsStyle = .abbreviated
-        return f
-    }()
+    @State private var now = Date()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -17,7 +18,7 @@ struct SessionRowView: View {
             HStack {
                 Text(entry.projectName)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(isSelected ? .white.opacity(0.7) : .secondary)
                     .lineLimit(1)
                 Spacer()
             }
@@ -33,7 +34,7 @@ struct SessionRowView: View {
                 previewLine(
                     icon: "bubble.right",
                     text: entry.firstPrompt.isEmpty ? "(no prompt)" : entry.firstPrompt,
-                    color: .primary
+                    style: isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.primary)
                 )
 
                 // Last user prompt (only if different from first)
@@ -41,7 +42,7 @@ struct SessionRowView: View {
                     previewLine(
                         icon: "bubble.right.fill",
                         text: entry.lastPrompt,
-                        color: .primary.opacity(0.7)
+                        style: isSelected ? AnyShapeStyle(.white.opacity(0.8)) : AnyShapeStyle(.primary.opacity(0.7))
                     )
                 }
 
@@ -50,7 +51,7 @@ struct SessionRowView: View {
                     previewLine(
                         icon: "sparkles",
                         text: entry.lastOutput,
-                        color: .secondary
+                        style: isSelected ? AnyShapeStyle(.white.opacity(0.7)) : AnyShapeStyle(.secondary)
                     )
                 }
             }
@@ -89,24 +90,25 @@ struct SessionRowView: View {
                     )
                 }
                 Spacer()
-                Text(Self.relativeFormatter.localizedString(for: entry.lastActivityAt, relativeTo: Date()))
+                Text(Self.relativeTime(from: entry.lastActivityAt, to: now))
                     .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(AnyShapeStyle(isSelected ? AnyShapeStyle(.white.opacity(0.5)) : AnyShapeStyle(.tertiary)))
             }
         }
         .padding(.vertical, 4)
+        .onReceive(relativeTimeTimer) { now = $0 }
     }
 
-    private func previewLine(icon: String, text: String, color: some ShapeStyle) -> some View {
+    private func previewLine(icon: String, text: String, style: AnyShapeStyle) -> some View {
         HStack(spacing: 4) {
             Image(systemName: icon)
                 .font(.system(size: 8))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(AnyShapeStyle(isSelected ? AnyShapeStyle(.white.opacity(0.5)) : AnyShapeStyle(.tertiary)))
                 .frame(width: 10)
             Text(text)
                 .font(.caption)
                 .lineLimit(1)
-                .foregroundStyle(color)
+                .foregroundStyle(style)
         }
     }
 
@@ -122,6 +124,21 @@ struct SessionRowView: View {
             .background(.red.opacity(0.85), in: Capsule())
     }
 
+    /// Friendly relative time without seconds-level precision.
+    private static func relativeTime(from date: Date, to now: Date) -> String {
+        let seconds = Int(now.timeIntervalSince(date))
+        if seconds < 60 { return "just now" }
+        let minutes = seconds / 60
+        if minutes < 60 { return "\(minutes)m ago" }
+        let hours = minutes / 60
+        if hours < 24 { return "\(hours)h ago" }
+        let days = hours / 24
+        if days < 30 { return "\(days)d ago" }
+        let months = days / 30
+        if months < 12 { return "\(months)mo ago" }
+        return "\(months / 12)y ago"
+    }
+
     private func metaBadge(text: String, icon: String? = nil, color: Color) -> some View {
         HStack(spacing: 2) {
             if let icon {
@@ -130,7 +147,7 @@ struct SessionRowView: View {
             Text(text)
         }
         .font(.caption2)
-        .foregroundStyle(color)
+        .foregroundStyle(isSelected ? .white.opacity(0.8) : color)
         .lineLimit(1)
     }
 }
