@@ -476,22 +476,55 @@ final class SessionStore {
             max($0, $1.lastActivityAt.timeIntervalSince($1.createdAt))
         }
 
-        // Hour counts — messages in the last 24 hours, by creation hour
+        // Hour counts — messages in the last 24 hours, distributed across active hours
         let calendar = Calendar.current
         let cutoff = Date().addingTimeInterval(-24 * 3600)
         var hourCounts: [Int: Int] = [:]
         for s in sessions where s.lastActivityAt > cutoff {
-            let hour = calendar.component(.hour, from: s.createdAt)
-            hourCounts[hour, default: 0] += s.messageCount
+            let startHour = calendar.component(.hour, from: max(s.createdAt, cutoff))
+            let endHour = calendar.component(.hour, from: s.lastActivityAt)
+            if startHour == endHour {
+                hourCounts[endHour, default: 0] += s.messageCount
+            } else {
+                // Distribute messages across active hours
+                var hours: [Int] = []
+                var h = startHour
+                while true {
+                    hours.append(h)
+                    if h == endHour { break }
+                    h = (h + 1) % 24
+                }
+                let perHour = s.messageCount / hours.count
+                let remainder = s.messageCount % hours.count
+                for (i, hour) in hours.enumerated() {
+                    hourCounts[hour, default: 0] += perHour + (i < remainder ? 1 : 0)
+                }
+            }
         }
 
-        // Daily activity — messages grouped by session creation date
+        // Daily activity — messages distributed across active days
         let df = DateFormatter()
         df.dateFormat = "yyyy-MM-dd"
         df.locale = Locale(identifier: "en_US_POSIX")
         var daily: [String: Int] = [:]
         for s in sessions {
-            daily[df.string(from: s.createdAt), default: 0] += s.messageCount
+            let startDay = calendar.startOfDay(for: s.createdAt)
+            let endDay = calendar.startOfDay(for: s.lastActivityAt)
+            if startDay == endDay {
+                daily[df.string(from: startDay), default: 0] += s.messageCount
+            } else {
+                var days: [String] = []
+                var d = startDay
+                while d <= endDay {
+                    days.append(df.string(from: d))
+                    d = calendar.date(byAdding: .day, value: 1, to: d) ?? d.addingTimeInterval(86400)
+                }
+                let perDay = s.messageCount / days.count
+                let remainder = s.messageCount % days.count
+                for (i, day) in days.enumerated() {
+                    daily[day, default: 0] += perDay + (i < remainder ? 1 : 0)
+                }
+            }
         }
         let dailyActivity = daily.map { DailyActivity(date: $0.key, messageCount: $0.value) }
             .sorted { $0.date < $1.date }

@@ -42,9 +42,26 @@ struct StatsOverviewView: View {
             buckets[startHour.addingTimeInterval(Double(i) * 3600)] = 0
         }
         for s in sessions {
-            let hour = calendar.dateInterval(of: .hour, for: s.lastActivityAt)?.start ?? s.lastActivityAt
-            if hour >= startHour, buckets[hour] != nil {
-                buckets[hour, default: 0] += s.messageCount
+            let endBucket = calendar.dateInterval(of: .hour, for: s.lastActivityAt)?.start ?? s.lastActivityAt
+            guard endBucket >= startHour else { continue }
+
+            let clippedStart = max(s.createdAt, startHour)
+            let startBucket = calendar.dateInterval(of: .hour, for: clippedStart)?.start ?? clippedStart
+
+            // Collect valid hour buckets this session spans
+            var validBuckets: [Date] = []
+            var h = startBucket
+            while h <= endBucket {
+                if buckets[h] != nil { validBuckets.append(h) }
+                h = h.addingTimeInterval(3600)
+            }
+            guard !validBuckets.isEmpty else { continue }
+
+            // Distribute messages evenly across active hours
+            let perBucket = s.messageCount / validBuckets.count
+            let remainder = s.messageCount % validBuckets.count
+            for (i, bucket) in validBuckets.enumerated() {
+                buckets[bucket, default: 0] += perBucket + (i < remainder ? 1 : 0)
             }
         }
         self.recentHourly = buckets.sorted { $0.key < $1.key }
