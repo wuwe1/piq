@@ -312,9 +312,9 @@ struct SessionDetailView: View {
 
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 1) {
-                    ForEach(userTurns, id: \.turn.id) { item in
+                    ForEach(userTurns.reversed(), id: \.turn.id) { item in
                         inspectorRow(item)
-                        if item.turn.id != userTurns.last?.turn.id {
+                        if item.turn.id != userTurns.first?.turn.id {
                             Divider().padding(.leading, 44)
                         }
                     }
