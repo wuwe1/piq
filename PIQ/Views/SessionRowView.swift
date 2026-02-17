@@ -20,14 +20,6 @@ struct SessionRowView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 Spacer()
-                if unreadCount > 0 {
-                    Text(unreadCount > 99 ? "99+" : "\(unreadCount)")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(.red, in: Capsule())
-                }
                 Text(Self.relativeFormatter.localizedString(for: entry.lastActivityAt, relativeTo: Date()))
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
@@ -95,6 +87,9 @@ struct SessionRowView: View {
                     )
                 }
                 Spacer()
+                if unreadCount > 0 {
+                    unreadBadge
+                }
             }
         }
         .padding(.vertical, 4)
@@ -111,6 +106,17 @@ struct SessionRowView: View {
                 .lineLimit(1)
                 .foregroundStyle(color)
         }
+    }
+
+    private var unreadBadge: some View {
+        let label = unreadCount > 99 ? "99+" : "\(unreadCount)"
+        let size: CGFloat = 16
+        return Text(label)
+            .font(.system(size: 9, weight: .semibold, design: .rounded))
+            .foregroundStyle(.white)
+            .frame(minWidth: size, minHeight: size)
+            .padding(.horizontal, unreadCount > 9 ? 3 : 0)
+            .background(.red.opacity(0.85), in: Capsule())
     }
 
     private func metaBadge(text: String, icon: String? = nil, color: Color) -> some View {
