@@ -5,7 +5,8 @@ import SwiftUI
 struct SessionTurnView: View {
     let turn: SessionTurn
 
-    @State private var showCopied = false
+    @State private var showCopiedAssistant = false
+    @State private var showCopiedUser = false
 
     /// All assistant text blocks joined as markdown for copy.
     private var assistantMarkdown: String {
@@ -15,6 +16,14 @@ struct SessionTurnView: View {
                 return nil
             }
         }.joined(separator: "\n\n")
+    }
+
+    /// All user text blocks joined as markdown for copy.
+    private var userMarkdown: String {
+        turn.userMessage?.contentBlocks.compactMap { block in
+            if case .text(_, let t) = block { return t }
+            return nil
+        }.joined(separator: "\n\n") ?? ""
     }
 
     /// A renderable item in the turn, preserving the original order from contentBlocks.
@@ -92,19 +101,42 @@ struct SessionTurnView: View {
     // MARK: - User Bubble
 
     private func userBubble(_ message: SessionMessage) -> some View {
-        HStack {
-            Spacer(minLength: 60)
-            VStack(alignment: .trailing, spacing: 2) {
-                ForEach(message.contentBlocks) { block in
-                    if case .text(_, let text) = block {
-                        Text(text)
-                            .font(.body)
-                            .textSelection(.enabled)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(.blue.opacity(0.15), in: RoundedRectangle(cornerRadius: 12))
+        VStack(alignment: .trailing, spacing: 4) {
+            HStack {
+                Spacer(minLength: 60)
+                VStack(alignment: .trailing, spacing: 2) {
+                    ForEach(message.contentBlocks) { block in
+                        if case .text(_, let text) = block {
+                            MarkdownTextView(text: text)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(.blue.opacity(0.15), in: RoundedRectangle(cornerRadius: 12))
+                        }
                     }
                 }
+            }
+
+            // User message footer
+            HStack(spacing: 8) {
+                Spacer()
+                if !userMarkdown.isEmpty {
+                    Button {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(userMarkdown, forType: .string)
+                        showCopiedUser = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                            showCopiedUser = false
+                        }
+                    } label: {
+                        Image(systemName: showCopiedUser ? "checkmark" : "doc.on.doc")
+                            .font(.caption2)
+                            .foregroundStyle(showCopiedUser ? Color.green : Color.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                Text(message.timestamp, format: .dateTime.hour().minute().second())
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
         }
     }
@@ -118,14 +150,14 @@ struct SessionTurnView: View {
                 Button {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(assistantMarkdown, forType: .string)
-                    showCopied = true
+                    showCopiedAssistant = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                        showCopied = false
+                        showCopiedAssistant = false
                     }
                 } label: {
-                    Image(systemName: showCopied ? "checkmark" : "doc.on.doc")
+                    Image(systemName: showCopiedAssistant ? "checkmark" : "doc.on.doc")
                         .font(.caption2)
-                        .foregroundStyle(showCopied ? Color.green : Color.secondary)
+                        .foregroundStyle(showCopiedAssistant ? Color.green : Color.secondary)
                 }
                 .buttonStyle(.plain)
             }
