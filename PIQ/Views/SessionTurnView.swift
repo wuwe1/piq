@@ -5,6 +5,18 @@ import SwiftUI
 struct SessionTurnView: View {
     let turn: SessionTurn
 
+    @State private var showCopied = false
+
+    /// All assistant text blocks joined as markdown for copy.
+    private var assistantMarkdown: String {
+        turn.assistantMessages.flatMap { msg in
+            msg.contentBlocks.compactMap { block in
+                if case .text(_, let t) = block { return t }
+                return nil
+            }
+        }.joined(separator: "\n\n")
+    }
+
     /// A renderable item in the turn, preserving the original order from contentBlocks.
     private enum TurnItem: Identifiable {
         case contentBlock(SessionContentBlock)
@@ -58,8 +70,13 @@ struct SessionTurnView: View {
             ForEach(orderedItems) { item in
                 switch item {
                 case .contentBlock(let block):
-                    SessionContentBlockView(block: block)
-                        .padding(.trailing, 16)
+                    if case .text = block {
+                        AssistantBubble(block: block)
+                            .padding(.trailing, 16)
+                    } else {
+                        SessionContentBlockView(block: block)
+                            .padding(.trailing, 16)
+                    }
                 case .toolCall(let pair):
                     SessionToolCallView(pair: pair)
                         .padding(.trailing, 16)
@@ -96,6 +113,23 @@ struct SessionTurnView: View {
 
     private var turnFooter: some View {
         HStack(spacing: 12) {
+            // Copy markdown button
+            if !assistantMarkdown.isEmpty {
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(assistantMarkdown, forType: .string)
+                    showCopied = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        showCopied = false
+                    }
+                } label: {
+                    Image(systemName: showCopied ? "checkmark" : "doc.on.doc")
+                        .font(.caption2)
+                        .foregroundStyle(showCopied ? Color.green : Color.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+
             if let duration = turn.durationMs {
                 Label(formatDuration(duration), systemImage: "clock")
                     .font(.caption2)
@@ -136,5 +170,20 @@ struct SessionTurnView: View {
             return String(format: "%.1fK", Double(count) / 1_000)
         }
         return "\(count)"
+    }
+}
+
+// MARK: - Assistant Bubble
+
+private struct AssistantBubble: View {
+    let block: SessionContentBlock
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SessionContentBlockView(block: block)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
     }
 }
