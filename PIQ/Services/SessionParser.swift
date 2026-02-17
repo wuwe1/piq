@@ -228,9 +228,11 @@ enum SessionParser {
 
             // Parse content blocks
             if let contentArray = message["content"] as? [[String: Any]] {
-                contentBlocks = contentArray.compactMap { parseContentBlock($0, messageType: msgType) }
+                contentBlocks = contentArray.enumerated().compactMap { i, dict in
+                    parseContentBlock(dict, messageType: msgType, messageId: uuid, blockIndex: i)
+                }
             } else if let textContent = message["content"] as? String {
-                contentBlocks = [.text(id: UUID().uuidString, text: textContent)]
+                contentBlocks = [.text(id: "\(uuid)-0", text: textContent)]
             }
 
             // Parse usage
@@ -477,18 +479,19 @@ enum SessionParser {
         return lines
     }
 
-    private static func parseContentBlock(_ dict: [String: Any], messageType: SessionMessageType) -> SessionContentBlock? {
+    private static func parseContentBlock(_ dict: [String: Any], messageType: SessionMessageType, messageId: String, blockIndex: Int) -> SessionContentBlock? {
         let blockType = dict["type"] as? String ?? ""
+        let stableId = "\(messageId)-\(blockIndex)"
 
         switch blockType {
         case "text":
             let text = dict["text"] as? String ?? ""
-            return .text(id: UUID().uuidString, text: text)
+            return .text(id: stableId, text: text)
 
         case "thinking":
             let text = dict["thinking"] as? String ?? ""
             guard !text.isEmpty else { return nil }
-            return .thinking(id: UUID().uuidString, text: text)
+            return .thinking(id: stableId, text: text)
 
         case "tool_use":
             let toolId = dict["id"] as? String ?? UUID().uuidString
@@ -501,7 +504,7 @@ enum SessionParser {
                     inputJSON = inputStr
                 }
             }
-            return .toolUse(id: UUID().uuidString, toolId: toolId, name: name, serverName: serverName, inputJSON: inputJSON)
+            return .toolUse(id: stableId, toolId: toolId, name: name, serverName: serverName, inputJSON: inputJSON)
 
         case "tool_result":
             let toolUseId = dict["tool_use_id"] as? String ?? ""
@@ -512,7 +515,7 @@ enum SessionParser {
             } else if let contentArray = dict["content"] as? [[String: Any]] {
                 content = contentArray.compactMap { $0["text"] as? String }.joined(separator: "\n")
             }
-            return .toolResult(id: UUID().uuidString, toolUseId: toolUseId, content: content, isError: isError)
+            return .toolResult(id: stableId, toolUseId: toolUseId, content: content, isError: isError)
 
         default:
             return nil
