@@ -329,6 +329,19 @@ struct SessionDetailView: View {
         text.hasPrefix("Base directory for this skill:")
     }}
 
+    /// First assistant text snippet for preview.
+    private func assistantPreview(_ turn: SessionTurn) -> String? {
+        for msg in turn.assistantMessages {
+            for block in msg.contentBlocks {
+                if case .text(_, let t) = block {
+                    let trimmed = t.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty { return String(trimmed.prefix(120)) }
+                }
+            }
+        }
+        return nil
+    }
+
     private func inspectorRow(_ item: (index: Int, turn: SessionTurn, text: String)) -> some View {
         let isSystem = isSystemMessage(item.text)
         let isSelected = scrollTarget == item.turn.id
@@ -348,14 +361,26 @@ struct SessionDetailView: View {
                         in: Circle()
                     )
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(item.text.prefix(120))
-                        .font(.caption)
-                        .foregroundStyle(isSystem ? .secondary : .primary)
-                        .italic(isSystem)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
+                VStack(alignment: .leading, spacing: 4) {
+                    // User message preview
+                    inspectorPreviewLine(
+                        icon: "bubble.right",
+                        text: item.text.isEmpty ? "(no prompt)" : String(item.text.prefix(120)),
+                        style: isSystem ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary),
+                        italic: isSystem
+                    )
 
+                    // Assistant response preview
+                    if let preview = assistantPreview(item.turn) {
+                        inspectorPreviewLine(
+                            icon: "sparkles",
+                            text: preview,
+                            style: AnyShapeStyle(.secondary),
+                            italic: false
+                        )
+                    }
+
+                    // Metadata badges
                     inspectorRowMeta(item.turn)
                 }
             }
@@ -373,26 +398,52 @@ struct SessionDetailView: View {
         .onHover { hovering in hoveredTurnId = hovering ? item.turn.id : nil }
     }
 
+    private func inspectorPreviewLine(icon: String, text: String, style: AnyShapeStyle, italic: Bool) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 8))
+                .foregroundStyle(.tertiary)
+                .frame(width: 10)
+            Text(text)
+                .font(.caption)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .foregroundStyle(style)
+                .italic(italic)
+        }
+    }
+
     private func inspectorRowMeta(_ turn: SessionTurn) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             if let ts = turn.userMessage?.timestamp {
-                Text(ts, format: .dateTime.hour().minute().second())
+                Text(ts, format: .dateTime.hour().minute())
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
             }
 
-            Spacer()
-
             let toolCount = turn.toolPairs.count
             if toolCount > 0 {
-                Label("\(toolCount)", systemImage: "wrench")
-                    .foregroundStyle(.blue.opacity(0.7))
+                inspectorBadge(text: "\(toolCount)", icon: "wrench", color: .blue)
             }
             if let usage = turn.totalUsage {
-                Label("\(formatCompact(usage.inputTokens))/\(formatCompact(usage.outputTokens))", systemImage: "sparkle")
-                    .foregroundStyle(.green.opacity(0.7))
+                inspectorBadge(
+                    text: "\(formatCompact(usage.inputTokens))/\(formatCompact(usage.outputTokens))",
+                    icon: "sparkle",
+                    color: .green
+                )
             }
+            Spacer()
+        }
+    }
+
+    private func inspectorBadge(text: String, icon: String, color: Color) -> some View {
+        HStack(spacing: 2) {
+            Image(systemName: icon)
+            Text(text)
         }
         .font(.caption2)
+        .foregroundStyle(color)
+        .lineLimit(1)
     }
 
     private func formatCompact(_ count: Int) -> String {
