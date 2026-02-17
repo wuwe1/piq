@@ -79,9 +79,13 @@ struct SessionTurnView: View {
             ForEach(orderedItems) { item in
                 switch item {
                 case .contentBlock(let block):
-                    if case .text = block {
+                    if case .text(_, let text) = block,
+                       !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         AssistantBubble(block: block)
                             .padding(.trailing, 16)
+                    } else if case .text = block {
+                        // Skip empty text blocks
+                        EmptyView()
                     } else {
                         SessionContentBlockView(block: block)
                             .padding(.trailing, 16)
