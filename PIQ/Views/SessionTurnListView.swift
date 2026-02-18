@@ -5,6 +5,7 @@ struct SessionTurnListView: View {
     @Bindable var store: SessionStore
     let rootSession: RootSession
 
+    @Environment(\.colorScheme) private var colorScheme
     @State private var userTurns: [UserTurnItem] = []
 
     struct UserTurnItem: Identifiable {
@@ -120,10 +121,20 @@ struct SessionTurnListView: View {
     }
 
     private var turnList: some View {
-        List(selection: turnIndexBinding) {
+        List {
             ForEach(userTurns.reversed()) { item in
+                let isSelected = store.selectedTurnIndex == item.globalIndex
                 turnRow(item)
-                    .tag(item.globalIndex)
+                    .listRowBackground(
+                        isSelected
+                            ? RoundedRectangle(cornerRadius: 6).fill(Color.accentColor)
+                            : nil
+                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        turnIndexBinding.wrappedValue = item.globalIndex
+                    }
+                    .environment(\.colorScheme, isSelected ? .dark : colorScheme)
             }
         }
         .listStyle(.inset)
@@ -162,7 +173,7 @@ struct SessionTurnListView: View {
                 .foregroundStyle(isSelected ? .white : .secondary)
                 .frame(width: 24, height: 24)
                 .background(
-                    isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.quaternary),
+                    isSelected ? AnyShapeStyle(Color.white.opacity(0.2)) : AnyShapeStyle(.quaternary),
                     in: Circle()
                 )
 
