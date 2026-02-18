@@ -7,6 +7,7 @@ struct SessionTurnListView: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var userTurns: [UserTurnItem] = []
+    @State private var displayTurns: [UserTurnItem] = []  // cached filtered + reversed
     @State private var searchText: String = ""
 
     struct UserTurnItem: Identifiable {
@@ -62,23 +63,28 @@ struct SessionTurnListView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onChange(of: store.loadedTurnsVersion, initial: true) { _, _ in
             userTurns = Self.computeUserTurns(from: store.loadedTurns)
+            recomputeDisplayTurns()
             // Sync selectedTurns for auto-selected turn (e.g. on initial load)
             if let idx = store.selectedTurnIndex,
                let item = userTurns.first(where: { $0.globalIndex == idx }) {
                 store.selectedTurns = item.allTurns
             }
         }
+        .onChange(of: searchText) { _, _ in recomputeDisplayTurns() }
     }
 
-    private var filteredTurns: [UserTurnItem] {
-        guard !searchText.isEmpty else { return userTurns }
-        let query = searchText.lowercased()
-        return userTurns.filter { item in
-            if item.text.lowercased().contains(query) { return true }
-            if let preview = assistantPreview(item.turn),
-               preview.lowercased().contains(query) { return true }
-            return false
+    private func recomputeDisplayTurns() {
+        var filtered = userTurns
+        if !searchText.isEmpty {
+            let query = searchText.lowercased()
+            filtered = userTurns.filter { item in
+                if item.text.lowercased().contains(query) { return true }
+                if let preview = assistantPreview(item.turn),
+                   preview.lowercased().contains(query) { return true }
+                return false
+            }
         }
+        displayTurns = filtered.reversed()
     }
 
     // MARK: - Header
@@ -156,9 +162,8 @@ struct SessionTurnListView: View {
     }
 
     private var turnList: some View {
-        let reversedTurns = filteredTurns.reversed() as [UserTurnItem]
-        return List {
-            ForEach(reversedTurns) { item in
+        List {
+            ForEach(displayTurns) { item in
                 let isSelected = store.selectedTurnIndex == item.globalIndex
                 turnRow(item)
                     .listRowBackground(
@@ -175,10 +180,10 @@ struct SessionTurnListView: View {
         }
         .listStyle(.inset)
         .onKeyPress(.upArrow) {
-            navigateTurn(direction: .up, in: reversedTurns)
+            navigateTurn(direction: .up, in: displayTurns)
         }
         .onKeyPress(.downArrow) {
-            navigateTurn(direction: .down, in: reversedTurns)
+            navigateTurn(direction: .down, in: displayTurns)
         }
     }
 

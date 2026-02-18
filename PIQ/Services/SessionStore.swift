@@ -1,4 +1,7 @@
 import Foundation
+import os
+
+private let perfLog = Logger(subsystem: "com.piq.app", category: "perf")
 
 // MARK: - ClaudeStats
 
@@ -323,6 +326,7 @@ final class SessionStore {
         scanProgress = nil
         let index = sessionIndex
         let isFirstLoad = readState.lastReadCounts.isEmpty && index.entries.isEmpty
+        let rescanStart = ContinuousClock.now
         Task.detached(priority: .userInitiated) { [index] in
             // Load persistent caches off the main thread
             var loadedIndex = index
@@ -330,16 +334,19 @@ final class SessionStore {
                 loadedIndex = SessionIndex.load()
             }
             let loadedReadState: ReadState? = isFirstLoad ? nil : ReadState.load()
+            perfLog.info("[rescan] index+readState loaded: \(rescanStart.duration(to: .now))")
 
             let result = await Self.scanWithIndex(loadedIndex) { progress in
                 await MainActor.run {
                     self.scanProgress = progress
                 }
             }
+            perfLog.info("[rescan] scanWithIndex done: \(rescanStart.duration(to: .now)), entries=\(result.allEntries.count), changed=\(result.changedFiles.count)")
             let sorted = result.allEntries.sorted { $0.lastActivityAt > $1.lastActivityAt }
             let newStats = Self.computeStats(from: sorted)
             let cache = StatsCache.load()
             result.updatedIndex.save()
+            perfLog.info("[rescan] stats+save done: \(rescanStart.duration(to: .now))")
             await MainActor.run {
                 self.sessions = sorted
                 self.sessionIndex = result.updatedIndex
@@ -368,11 +375,16 @@ final class SessionStore {
     /// All file I/O runs on a background thread; only final state assignment is on MainActor.
     func incrementalUpdate() {
         let index = sessionIndex
+        let updateStart = ContinuousClock.now
 
         Task.detached(priority: .userInitiated) { [index] in
             let result = await Self.scanWithIndex(index)
 
-            guard result.hasChanges else { return }
+            guard result.hasChanges else {
+                perfLog.debug("[incremental] no changes: \(updateStart.duration(to: .now))")
+                return
+            }
+            perfLog.info("[incremental] scan done: \(updateStart.duration(to: .now)), changed=\(result.changedFiles.count)")
 
             let sorted = result.allEntries.sorted { $0.lastActivityAt > $1.lastActivityAt }
             let newStats = Self.computeStats(from: sorted)
@@ -393,7 +405,9 @@ final class SessionStore {
                 if let entries = groups[loadedId] {
                     let changedEntries = entries.filter { result.changedFiles.contains($0.jsonlURL) }
                     if !changedEntries.isEmpty {
+                        let parseStart = ContinuousClock.now
                         refreshedEntryTurns = await Self.parseEntriesParallel(changedEntries)
+                        perfLog.info("[incremental] re-parsed \(changedEntries.count) entries: \(parseStart.duration(to: .now))")
                     }
                 }
             }
@@ -413,9 +427,10 @@ final class SessionStore {
                     }
                 }
 
-                // Apply pre-parsed results and reassemble the loaded session
+                // Apply pre-parsed results only if the same session is still loaded
                 if let parsed = refreshedEntryTurns,
-                   let loadedId = self.loadedSessionId,
+                   let loadedId,
+                   loadedId == self.loadedSessionId,
                    let rs = self.rootSessions.first(where: { $0.id == loadedId }) {
                     self.cacheEntryResults(parsed, forSession: loadedId)
                     let (allTurns, _) = self.assembleTurns(for: rs)
@@ -533,7 +548,9 @@ final class SessionStore {
     /// Load full session detail (turns) for a RootSession (all entries merged).
     /// Uses per-entry cache: only uncached entries are parsed. Cached entries are assembled instantly.
     func loadSessionDetail(rootSession: RootSession, isRefresh: Bool = false) async {
+        let detailStart = ContinuousClock.now
         loadedSessionId = rootSession.id
+        markEntriesRead(rootSession.entries)
 
         let (cachedTurns, uncachedEntries) = assembleTurns(for: rootSession)
 
@@ -547,7 +564,7 @@ final class SessionStore {
                 selectedTurnIndex = cachedTurns.isEmpty ? nil : cachedTurns.count - 1
                 selectedTurns = []
             }
-            markEntriesRead(rootSession.entries)
+            perfLog.info("[detail] cache hit: \(cachedTurns.count) turns, \(detailStart.duration(to: .now))")
             return
         }
 
@@ -560,9 +577,8 @@ final class SessionStore {
             selectedTurns = []
         }
 
-        markEntriesRead(rootSession.entries)
-
         // Parse only uncached entries in parallel
+        perfLog.info("[detail] parsing \(uncachedEntries.count) uncached entries (cached=\(rootSession.entries.count - uncachedEntries.count))...")
         let parsed = await Self.parseEntriesParallel(uncachedEntries)
         guard !Task.isCancelled, loadedSessionId == rootSession.id else { return }
 
@@ -575,6 +591,7 @@ final class SessionStore {
         if selectedTurnIndex == nil && !allTurns.isEmpty {
             selectedTurnIndex = allTurns.count - 1
         }
+        perfLog.info("[detail] loaded \(allTurns.count) turns total: \(detailStart.duration(to: .now))")
     }
 
     private func markEntriesRead(_ entries: [SessionEntry]) {
