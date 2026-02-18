@@ -210,7 +210,7 @@ final class SessionStore {
     private(set) var statsCache: StatsCache?
     private var fileWatcher: SessionFileWatcher?
     private var sessionIndex = SessionIndex()
-    private var readState = ReadState.load()
+    private var readState = ReadState()
     private(set) var unreadCounts: [String: Int] = [:]
 
     /// Root sessions (grouped by sessionId, merging continuations).
@@ -225,28 +225,50 @@ final class SessionStore {
     /// content changes even when the turn count stays the same.
     private(set) var loadedTurnsVersion: Int = 0
 
-    /// In-memory cache of parsed turns keyed by root session ID.
-    /// Capped at `turnsCacheLimit` entries; oldest accessed entries are evicted on insert.
-    private var turnsCache: [String: [SessionTurn]] = [:]
-    private var turnsCacheOrder: [String] = []  // LRU order: oldest first
-    private let turnsCacheLimit = 10
+    /// Per-entry turn cache: entry.id → parsed turns.
+    /// Only changed entries need re-parsing; others are served from cache.
+    private var entryTurnsCache: [String: [SessionTurn]] = [:]
+    /// LRU tracking at session level for eviction.
+    private var cachedSessionOrder: [String] = []  // oldest first
+    private let sessionCacheLimit = 10
 
-    /// Store parsed turns in the LRU cache, evicting the oldest entry if over capacity.
-    private func cacheTurns(_ turns: [SessionTurn], forSession id: String) {
-        turnsCacheOrder.removeAll { $0 == id }
-        turnsCacheOrder.append(id)
-        turnsCache[id] = turns
-        while turnsCacheOrder.count > turnsCacheLimit {
-            let evicted = turnsCacheOrder.removeFirst()
-            turnsCache.removeValue(forKey: evicted)
+    /// Cache parsed turns for entries, tracking their parent session for LRU eviction.
+    private func cacheEntryResults(_ results: [(String, [SessionTurn])], forSession sessionId: String) {
+        for (entryId, turns) in results {
+            entryTurnsCache[entryId] = turns
+        }
+        touchSessionLRU(sessionId)
+    }
+
+    /// Touch the LRU order and evict if over capacity.
+    private func touchSessionLRU(_ sessionId: String) {
+        cachedSessionOrder.removeAll { $0 == sessionId }
+        cachedSessionOrder.append(sessionId)
+        while cachedSessionOrder.count > sessionCacheLimit {
+            let evicted = cachedSessionOrder.removeFirst()
+            if let rs = rootSessions.first(where: { $0.id == evicted }) {
+                for entry in rs.entries { entryTurnsCache.removeValue(forKey: entry.id) }
+            }
         }
     }
 
-    /// Touch the LRU order for a cache read.
-    private func touchCache(forSession id: String) {
-        turnsCacheOrder.removeAll { $0 == id }
-        turnsCacheOrder.append(id)
+    /// Assemble turns for a root session from the per-entry cache.
+    /// Returns assembled turns (in entry order) and any entries not yet cached.
+    private func assembleTurns(for rootSession: RootSession) -> (turns: [SessionTurn], uncached: [SessionEntry]) {
+        var turns: [SessionTurn] = []
+        var uncached: [SessionEntry] = []
+        for entry in rootSession.entries {
+            if let cached = entryTurnsCache[entry.id] {
+                turns.append(contentsOf: cached)
+            } else {
+                uncached.append(entry)
+            }
+        }
+        return (turns, uncached)
     }
+
+    /// Active detail-loading task; cancelled when switching sessions.
+    private var detailLoadTask: Task<Void, Never>?
 
     /// Currently selected turn index within loadedTurns.
     var selectedTurnIndex: Int? = nil
@@ -259,14 +281,15 @@ final class SessionStore {
         selectedTurns.last
     }
 
-    /// Recompute rootSessions from current sessions list.
+    /// Recompute rootSessions from current sessions list, grouped by project path.
     private func recomputeRootSessions() {
         var groups: [String: [SessionEntry]] = [:]
         for s in sessions {
-            groups[s.sessionId, default: []].append(s)
+            let key = s.projectPath.isEmpty ? s.sessionId : s.projectPath
+            groups[key, default: []].append(s)
         }
-        rootSessions = groups.map { (sessionId, entries) in
-            RootSession(id: sessionId, entries: entries.sorted { $0.createdAt < $1.createdAt })
+        rootSessions = groups.map { (key, entries) in
+            RootSession(id: key, entries: entries.sorted { $0.createdAt < $1.createdAt })
         }.sorted { $0.lastActivityAt > $1.lastActivityAt }
     }
 
@@ -298,12 +321,17 @@ final class SessionStore {
     func rescan() {
         isLoading = true
         scanProgress = nil
-        var index = sessionIndex
-        if index.entries.isEmpty {
-            index = SessionIndex.load()
-        }
+        let index = sessionIndex
+        let isFirstLoad = readState.lastReadCounts.isEmpty && index.entries.isEmpty
         Task.detached(priority: .userInitiated) { [index] in
-            let result = await Self.scanWithIndex(index) { progress in
+            // Load persistent caches off the main thread
+            var loadedIndex = index
+            if loadedIndex.entries.isEmpty {
+                loadedIndex = SessionIndex.load()
+            }
+            let loadedReadState: ReadState? = isFirstLoad ? nil : ReadState.load()
+
+            let result = await Self.scanWithIndex(loadedIndex) { progress in
                 await MainActor.run {
                     self.scanProgress = progress
                 }
@@ -320,6 +348,11 @@ final class SessionStore {
                 self.scanProgress = nil
                 self.isLoading = false
                 self.recomputeRootSessions()
+
+                // Restore persisted read state from disk
+                if let loadedReadState {
+                    self.readState = loadedReadState
+                }
 
                 // First launch: mark all as read to avoid showing everything as unread
                 if self.readState.lastReadCounts.isEmpty {
@@ -346,6 +379,25 @@ final class SessionStore {
             let cache = StatsCache.load()
             result.updatedIndex.save()
 
+            // If the loaded session is affected, re-parse only the changed entries
+            // on the background thread BEFORE switching to MainActor.
+            let loadedId = await MainActor.run { self.loadedSessionId }
+            var refreshedEntryTurns: [(String, [SessionTurn])]?
+            if let loadedId {
+                // Build the updated root session to find changed entries
+                var groups: [String: [SessionEntry]] = [:]
+                for s in sorted {
+                    let key = s.projectPath.isEmpty ? s.sessionId : s.projectPath
+                    groups[key, default: []].append(s)
+                }
+                if let entries = groups[loadedId] {
+                    let changedEntries = entries.filter { result.changedFiles.contains($0.jsonlURL) }
+                    if !changedEntries.isEmpty {
+                        refreshedEntryTurns = await Self.parseEntriesParallel(changedEntries)
+                    }
+                }
+            }
+
             await MainActor.run {
                 self.sessions = sorted
                 self.sessionIndex = result.updatedIndex
@@ -354,21 +406,27 @@ final class SessionStore {
                 self.recomputeRootSessions()
                 self.recomputeUnreadCounts()
 
-                // Invalidate turnsCache for any session whose files changed
+                // Invalidate entry cache for changed files
                 for rs in self.rootSessions {
-                    if rs.entries.contains(where: { result.changedFiles.contains($0.jsonlURL) }) {
-                        self.turnsCache.removeValue(forKey: rs.id)
-                        self.turnsCacheOrder.removeAll { $0 == rs.id }
+                    for entry in rs.entries where result.changedFiles.contains(entry.jsonlURL) {
+                        self.entryTurnsCache.removeValue(forKey: entry.id)
                     }
                 }
 
-                // Refresh detail if loaded session changed
-                if let loadedId = self.loadedSessionId,
-                   let rs = self.rootSessions.first(where: { $0.id == loadedId }),
-                   rs.entries.contains(where: { result.changedFiles.contains($0.jsonlURL) }) {
-                    Task {
-                        await self.loadSessionDetail(rootSession: rs, isRefresh: true)
+                // Apply pre-parsed results and reassemble the loaded session
+                if let parsed = refreshedEntryTurns,
+                   let loadedId = self.loadedSessionId,
+                   let rs = self.rootSessions.first(where: { $0.id == loadedId }) {
+                    self.cacheEntryResults(parsed, forSession: loadedId)
+                    let (allTurns, _) = self.assembleTurns(for: rs)
+                    self.loadedTurns = allTurns
+                    self.loadedTurnsVersion += 1
+                    // Mark read
+                    for entry in rs.entries {
+                        self.readState.markRead(sessionId: entry.id, readableMessageCount: entry.readableMessageCount)
                     }
+                    self.readState.save()
+                    self.recomputeUnreadCounts()
                 }
             }
         }
@@ -472,89 +530,108 @@ final class SessionStore {
 
     // MARK: - Detail Loading
 
-    /// Load full session detail (turns) for a RootSession (all continuations merged).
+    /// Load full session detail (turns) for a RootSession (all entries merged).
+    /// Uses per-entry cache: only uncached entries are parsed. Cached entries are assembled instantly.
     func loadSessionDetail(rootSession: RootSession, isRefresh: Bool = false) async {
         loadedSessionId = rootSession.id
 
-        // If switching sessions and we have a cached result, show it immediately
-        // and skip re-parsing — incrementalUpdate handles cache invalidation on file changes.
-        if !isRefresh, let cached = turnsCache[rootSession.id] {
-            touchCache(forSession: rootSession.id)
-            loadedTurns = cached
+        let (cachedTurns, uncachedEntries) = assembleTurns(for: rootSession)
+
+        if uncachedEntries.isEmpty {
+            // Fully cached: show immediately, no parsing needed
+            loadedTurns = cachedTurns
             loadedTurnsVersion += 1
             isLoadingDetail = false
-            selectedTurnIndex = nil
-            selectedTurns = []
-            if !cached.isEmpty {
-                selectedTurnIndex = cached.count - 1
+            touchSessionLRU(rootSession.id)
+            if !isRefresh {
+                selectedTurnIndex = cachedTurns.isEmpty ? nil : cachedTurns.count - 1
+                selectedTurns = []
             }
-            // Mark read and return — no need for background re-parse
-            for entry in rootSession.entries {
-                readState.markRead(sessionId: entry.id, readableMessageCount: entry.readableMessageCount)
-            }
-            readState.save()
-            recomputeUnreadCounts()
+            markEntriesRead(rootSession.entries)
             return
-        } else if !isRefresh {
+        }
+
+        // Show whatever is cached so far (partial or empty)
+        if !isRefresh {
+            loadedTurns = cachedTurns
+            loadedTurnsVersion += 1
             isLoadingDetail = true
-            loadedTurns = []
-            selectedTurnIndex = nil
+            selectedTurnIndex = cachedTurns.isEmpty ? nil : cachedTurns.count - 1
             selectedTurns = []
         }
 
-        // Mark all entries as read
-        for entry in rootSession.entries {
+        markEntriesRead(rootSession.entries)
+
+        // Parse only uncached entries in parallel
+        let parsed = await Self.parseEntriesParallel(uncachedEntries)
+        guard !Task.isCancelled, loadedSessionId == rootSession.id else { return }
+
+        // Store results in per-entry cache and reassemble
+        cacheEntryResults(parsed, forSession: rootSession.id)
+        let (allTurns, _) = assembleTurns(for: rootSession)
+        loadedTurns = allTurns
+        loadedTurnsVersion += 1
+        isLoadingDetail = false
+        if selectedTurnIndex == nil && !allTurns.isEmpty {
+            selectedTurnIndex = allTurns.count - 1
+        }
+    }
+
+    private func markEntriesRead(_ entries: [SessionEntry]) {
+        for entry in entries {
             readState.markRead(sessionId: entry.id, readableMessageCount: entry.readableMessageCount)
         }
         readState.save()
         recomputeUnreadCounts()
+    }
 
-        let entries = rootSession.entries
-        let turns = await Task.detached(priority: .userInitiated) {
-            var allTurns: [SessionTurn] = []
-            for entry in entries {
-                let messages = SessionParser.parseFile(at: entry.jsonlURL)
-                var turns = SessionParser.groupIntoTurns(messages)
+    /// Parse multiple entries in parallel, returning per-entry results in input order.
+    private nonisolated static func parseEntriesParallel(_ entries: [SessionEntry]) async -> [(String, [SessionTurn])] {
+        await withTaskGroup(of: (Int, String, [SessionTurn]).self) { group in
+            for (index, entry) in entries.enumerated() {
+                group.addTask {
+                    let messages = SessionParser.parseFile(at: entry.jsonlURL)
+                    var turns = SessionParser.groupIntoTurns(messages)
 
-                // Load agent conversations and attach to Task tool calls
-                let agentMap = SessionParser.loadAgentTurns(
-                    sessionDir: entry.jsonlURL.deletingLastPathComponent(),
-                    sessionId: entry.sessionId
-                )
-                if !agentMap.isEmpty {
-                    for i in turns.indices {
-                        for j in turns[i].toolPairs.indices {
-                            let pair = turns[i].toolPairs[j]
-                            if pair.name == "Task",
-                               let output = pair.output,
-                               let agentId = SessionParser.extractAgentId(from: output),
-                               let agentTurns = agentMap[agentId] {
-                                turns[i].toolPairs[j].agentTurns = agentTurns
+                    let agentMap = SessionParser.loadAgentTurns(
+                        sessionDir: entry.jsonlURL.deletingLastPathComponent(),
+                        sessionId: entry.sessionId
+                    )
+                    if !agentMap.isEmpty {
+                        for i in turns.indices {
+                            for j in turns[i].toolPairs.indices {
+                                let pair = turns[i].toolPairs[j]
+                                if pair.name == "Task",
+                                   let output = pair.output,
+                                   let agentId = SessionParser.extractAgentId(from: output),
+                                   let agentTurns = agentMap[agentId] {
+                                    turns[i].toolPairs[j].agentTurns = agentTurns
+                                }
                             }
                         }
                     }
+                    return (index, entry.id, turns)
                 }
-                allTurns.append(contentsOf: turns)
             }
-            return allTurns
-        }.value
 
-        // Only update if we're still viewing this session
-        if loadedSessionId == rootSession.id {
-            cacheTurns(turns, forSession: rootSession.id)
-            loadedTurns = turns
-            loadedTurnsVersion += 1
-            isLoadingDetail = false
-            // Default to selecting the last turn
-            if !turns.isEmpty && selectedTurnIndex == nil {
-                selectedTurnIndex = turns.count - 1
-            }
+            var results = [(Int, String, [SessionTurn])]()
+            for await result in group { results.append(result) }
+            return results.sorted { $0.0 < $1.0 }.map { ($0.1, $0.2) }
+        }
+    }
+
+    /// Fire-and-forget wrapper that cancels any in-flight detail load before starting a new one.
+    func loadSessionDetailAsync(rootSession: RootSession) {
+        detailLoadTask?.cancel()
+        detailLoadTask = Task {
+            await loadSessionDetail(rootSession: rootSession)
         }
     }
 
     /// Compat: load by single entry (used by MenuBar). Finds the RootSession and delegates.
     func loadSessionDetail(entry: SessionEntry, isRefresh: Bool = false) async {
-        if let rs = rootSessions.first(where: { $0.id == entry.sessionId }) {
+        let key = entry.projectPath.isEmpty ? entry.sessionId : entry.projectPath
+        if let rs = rootSessions.first(where: { $0.id == key }) {
             await loadSessionDetail(rootSession: rs, isRefresh: isRefresh)
         }
     }

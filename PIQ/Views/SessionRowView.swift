@@ -20,14 +20,6 @@ struct SessionRowView: View {
                     .font(.caption)
                     .foregroundStyle(isSelected ? .white.opacity(0.7) : .secondary)
                     .lineLimit(1)
-                if rootSession.continuationCount > 1 {
-                    Text("\(rootSession.continuationCount)")
-                        .font(.system(size: 8, weight: .bold, design: .rounded))
-                        .foregroundStyle(isSelected ? .white.opacity(0.7) : .orange)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1)
-                        .background(isSelected ? .white.opacity(0.15) : .orange.opacity(0.12), in: Capsule())
-                }
                 Spacer()
             }
             .overlay(alignment: .topTrailing) {

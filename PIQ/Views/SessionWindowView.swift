@@ -40,6 +40,7 @@ struct SessionWindowView: View {
     @AppStorage("selectedProjectFilter") private var projectFilterStorage: String = ""
     @State private var dateFilter: DateFilter = .all
     @State private var displayRootSessions: [RootSession] = []
+    @State private var cachedUniqueProjects: [(path: String, name: String)] = []
 
     /// Bridge @AppStorage string to optional project filter.
     private var projectFilter: String? {
@@ -78,7 +79,10 @@ struct SessionWindowView: View {
                 appState.pendingSessionId = nil
             }
         }
-        .onChange(of: sessionStore?.rootSessions, initial: true) { _, _ in recomputeFilteredSessions() }
+        .onChange(of: sessionStore?.rootSessions, initial: true) { _, _ in
+            recomputeUniqueProjects()
+            recomputeFilteredSessions()
+        }
         .onChange(of: searchText) { _, _ in recomputeFilteredSessions() }
         .onChange(of: projectFilterStorage) { _, _ in recomputeFilteredSessions() }
         .onChange(of: dateFilter) { _, _ in recomputeFilteredSessions() }
@@ -198,16 +202,17 @@ struct SessionWindowView: View {
         mode = .sessions
         selectedSessionId = sessionId
         if let rs = sessionStore?.rootSessions.first(where: { $0.id == sessionId }) {
-            Task {
-                await sessionStore?.loadSessionDetail(rootSession: rs)
-            }
+            sessionStore?.loadSessionDetailAsync(rootSession: rs)
         }
     }
 
     // MARK: - Filtering
 
-    private var uniqueProjects: [(path: String, name: String)] {
-        guard let store = sessionStore else { return [] }
+    private func recomputeUniqueProjects() {
+        guard let store = sessionStore else {
+            cachedUniqueProjects = []
+            return
+        }
         var seen = Set<String>()
         var result: [(path: String, name: String)] = []
         for rs in store.rootSessions {
@@ -215,7 +220,7 @@ struct SessionWindowView: View {
                 result.append((rs.projectPath, rs.projectName))
             }
         }
-        return result.sorted { $0.name.lowercased() < $1.name.lowercased() }
+        cachedUniqueProjects = result.sorted { $0.name.lowercased() < $1.name.lowercased() }
     }
 
     private func recomputeFilteredSessions() {
@@ -250,7 +255,7 @@ struct SessionWindowView: View {
 
     private var selectedProjectName: String {
         if let filter = projectFilter,
-           let project = uniqueProjects.first(where: { $0.path == filter }) {
+           let project = cachedUniqueProjects.first(where: { $0.path == filter }) {
             return project.name
         }
         return "All"
@@ -277,7 +282,7 @@ struct SessionWindowView: View {
                         }
                         .buttonStyle(.plain)
                     }
-                    if uniqueProjects.count > 1 {
+                    if cachedUniqueProjects.count > 1 {
                         Menu {
                             Button {
                                 setProjectFilter(nil)
@@ -289,7 +294,7 @@ struct SessionWindowView: View {
                                 }
                             }
                             Divider()
-                            ForEach(uniqueProjects, id: \.path) { project in
+                            ForEach(cachedUniqueProjects, id: \.path) { project in
                                 Button {
                                     setProjectFilter(project.path)
                                 } label: {
@@ -384,9 +389,7 @@ struct SessionWindowView: View {
                 .onChange(of: selectedSessionId) { _, newValue in
                     if let id = newValue,
                        let rs = displayRootSessions.first(where: { $0.id == id }) {
-                        Task {
-                            await sessionStore?.loadSessionDetail(rootSession: rs)
-                        }
+                        sessionStore?.loadSessionDetailAsync(rootSession: rs)
                     } else {
                         sessionStore?.clearDetail()
                     }

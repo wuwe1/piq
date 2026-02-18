@@ -167,7 +167,7 @@ enum ScreenshotMockData {
 
     static func rootSessions() -> [RootSession] {
         sessions().map { entry in
-            RootSession(id: entry.sessionId, entries: [entry])
+            RootSession(id: entry.projectPath.isEmpty ? entry.sessionId : entry.projectPath, entries: [entry])
         }
     }
 

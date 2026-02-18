@@ -6,11 +6,15 @@ struct MenuBarView: View {
     @State private var searchText = ""
     @State private var projectFilter: String?
     @State private var displayRootSessions: [RootSession] = []
+    @State private var cachedUniqueProjects: [(path: String, name: String)] = []
 
     private var sessionStore: SessionStore? { appState.sessionStore }
 
-    private var uniqueProjects: [(path: String, name: String)] {
-        guard let store = sessionStore else { return [] }
+    private func recomputeUniqueProjects() {
+        guard let store = sessionStore else {
+            cachedUniqueProjects = []
+            return
+        }
         var seen = Set<String>()
         var result: [(path: String, name: String)] = []
         for rs in store.rootSessions {
@@ -18,7 +22,7 @@ struct MenuBarView: View {
                 result.append((rs.projectPath, rs.projectName))
             }
         }
-        return result.sorted { $0.name.lowercased() < $1.name.lowercased() }
+        cachedUniqueProjects = result.sorted { $0.name.lowercased() < $1.name.lowercased() }
     }
 
     private func recomputeFilteredSessions() {
@@ -54,7 +58,10 @@ struct MenuBarView: View {
             Divider()
             footer
         }
-        .onChange(of: sessionStore?.rootSessions, initial: true) { _, _ in recomputeFilteredSessions() }
+        .onChange(of: sessionStore?.rootSessions, initial: true) { _, _ in
+            recomputeUniqueProjects()
+            recomputeFilteredSessions()
+        }
         .onChange(of: searchText) { _, _ in recomputeFilteredSessions() }
         .onChange(of: projectFilter) { _, _ in recomputeFilteredSessions() }
     }
@@ -89,7 +96,7 @@ struct MenuBarView: View {
 
     private var selectedProjectName: String {
         if let filter = projectFilter,
-           let project = uniqueProjects.first(where: { $0.path == filter }) {
+           let project = cachedUniqueProjects.first(where: { $0.path == filter }) {
             return project.name
         }
         return "All"
@@ -113,7 +120,7 @@ struct MenuBarView: View {
                 }
                 .buttonStyle(.plain)
             }
-            if uniqueProjects.count > 1 {
+            if cachedUniqueProjects.count > 1 {
                 Menu {
                     Button {
                         projectFilter = nil
@@ -125,7 +132,7 @@ struct MenuBarView: View {
                         }
                     }
                     Divider()
-                    ForEach(uniqueProjects, id: \.path) { project in
+                    ForEach(cachedUniqueProjects, id: \.path) { project in
                         Button {
                             projectFilter = project.path
                         } label: {
