@@ -299,7 +299,7 @@ struct SessionTurnListView: View {
             pendingTurns = []
 
             result.append(UserTurnItem(
-                id: turn.id,
+                id: "\(turn.id)-\(turn.assistantMessages.count)-\(turn.toolPairs.count)",
                 index: userIdx,
                 globalIndex: globalIndex,
                 turn: turn,
