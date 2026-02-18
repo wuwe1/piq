@@ -210,7 +210,27 @@ final class SessionStore {
     private(set) var loadedTurnsVersion: Int = 0
 
     /// In-memory cache of parsed turns keyed by root session ID.
+    /// Capped at `turnsCacheLimit` entries; oldest accessed entries are evicted on insert.
     private var turnsCache: [String: [SessionTurn]] = [:]
+    private var turnsCacheOrder: [String] = []  // LRU order: oldest first
+    private let turnsCacheLimit = 10
+
+    /// Store parsed turns in the LRU cache, evicting the oldest entry if over capacity.
+    private func cacheTurns(_ turns: [SessionTurn], forSession id: String) {
+        turnsCacheOrder.removeAll { $0 == id }
+        turnsCacheOrder.append(id)
+        turnsCache[id] = turns
+        while turnsCacheOrder.count > turnsCacheLimit {
+            let evicted = turnsCacheOrder.removeFirst()
+            turnsCache.removeValue(forKey: evicted)
+        }
+    }
+
+    /// Touch the LRU order for a cache read.
+    private func touchCache(forSession id: String) {
+        turnsCacheOrder.removeAll { $0 == id }
+        turnsCacheOrder.append(id)
+    }
 
     /// Currently selected turn index within loadedTurns.
     var selectedTurnIndex: Int? = nil
@@ -322,6 +342,7 @@ final class SessionStore {
                 for rs in self.rootSessions {
                     if rs.entries.contains(where: { result.changedFiles.contains($0.jsonlURL) }) {
                         self.turnsCache.removeValue(forKey: rs.id)
+                        self.turnsCacheOrder.removeAll { $0 == rs.id }
                     }
                 }
 
@@ -440,7 +461,9 @@ final class SessionStore {
         loadedSessionId = rootSession.id
 
         // If switching sessions and we have a cached result, show it immediately
+        // and skip re-parsing — incrementalUpdate handles cache invalidation on file changes.
         if !isRefresh, let cached = turnsCache[rootSession.id] {
+            touchCache(forSession: rootSession.id)
             loadedTurns = cached
             loadedTurnsVersion += 1
             isLoadingDetail = false
@@ -449,6 +472,13 @@ final class SessionStore {
             if !cached.isEmpty {
                 selectedTurnIndex = cached.count - 1
             }
+            // Mark read and return — no need for background re-parse
+            for entry in rootSession.entries {
+                readState.markRead(sessionId: entry.id, readableMessageCount: entry.readableMessageCount)
+            }
+            readState.save()
+            recomputeUnreadCounts()
+            return
         } else if !isRefresh {
             isLoadingDetail = true
             loadedTurns = []
@@ -495,7 +525,7 @@ final class SessionStore {
 
         // Only update if we're still viewing this session
         if loadedSessionId == rootSession.id {
-            turnsCache[rootSession.id] = turns
+            cacheTurns(turns, forSession: rootSession.id)
             loadedTurns = turns
             loadedTurnsVersion += 1
             isLoadingDetail = false
@@ -516,6 +546,7 @@ final class SessionStore {
     /// Clear loaded detail.
     func clearDetail() {
         loadedTurns = []
+        loadedTurnsVersion += 1
         loadedSessionId = nil
         selectedTurnIndex = nil
         selectedTurns = []
