@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Top-level mode: sessions browser or stats overview.
@@ -6,17 +7,58 @@ enum WindowMode: String {
     case overview = "Overview"
 }
 
+/// Date range filter for the session sidebar.
+enum DateFilter: String, CaseIterable {
+    case all = "All"
+    case today = "Today"
+    case thisWeek = "Week"
+    case thisMonth = "Month"
+
+    /// Returns the cutoff date for this filter, or nil for `.all`.
+    func cutoffDate(calendar: Calendar = .current) -> Date? {
+        let now = Date()
+        switch self {
+        case .all:
+            return nil
+        case .today:
+            return calendar.startOfDay(for: now)
+        case .thisWeek:
+            return calendar.dateInterval(of: .weekOfYear, for: now)?.start
+        case .thisMonth:
+            return calendar.dateInterval(of: .month, for: now)?.start
+        }
+    }
+}
+
 /// Root view for the Claude Sessions window.
 /// Toolbar picker switches between Sessions (3-column NavigationSplitView) and Overview (full-width stats).
 struct SessionWindowView: View {
     @Environment(AppState.self) private var appState
-    @State private var mode: WindowMode = .sessions
+    @AppStorage("selectedMode") private var mode: WindowMode = .sessions
     @State private var selectedSessionId: String?
     @State private var searchText = ""
-    @State private var projectFilter: String?
+    @AppStorage("selectedProjectFilter") private var projectFilterStorage: String = ""
+    @State private var dateFilter: DateFilter = .all
     @State private var displayRootSessions: [RootSession] = []
 
+    /// Bridge @AppStorage string to optional project filter.
+    private var projectFilter: String? {
+        get { projectFilterStorage.isEmpty ? nil : projectFilterStorage }
+    }
+
+    private func setProjectFilter(_ value: String?) {
+        projectFilterStorage = value ?? ""
+    }
+
     private var sessionStore: SessionStore? { appState.sessionStore }
+
+    /// Whether the export action is currently available.
+    private var canExport: Bool {
+        guard let store = sessionStore,
+              selectedSessionId != nil,
+              !store.loadedTurns.isEmpty else { return false }
+        return true
+    }
 
     var body: some View {
         Group {
@@ -38,7 +80,8 @@ struct SessionWindowView: View {
         }
         .onChange(of: sessionStore?.rootSessions, initial: true) { _, _ in recomputeFilteredSessions() }
         .onChange(of: searchText) { _, _ in recomputeFilteredSessions() }
-        .onChange(of: projectFilter) { _, _ in recomputeFilteredSessions() }
+        .onChange(of: projectFilterStorage) { _, _ in recomputeFilteredSessions() }
+        .onChange(of: dateFilter) { _, _ in recomputeFilteredSessions() }
         .onChange(of: appState.pendingSessionId) { _, newValue in
             guard let pending = newValue else { return }
             navigateToSession(pending)
@@ -75,6 +118,9 @@ struct SessionWindowView: View {
             ToolbarItem(placement: .principal) {
                 modePicker
             }
+            ToolbarItem(placement: .primaryAction) {
+                toolbarButtons
+            }
         }
     }
 
@@ -94,8 +140,56 @@ struct SessionWindowView: View {
                 ToolbarItem(placement: .principal) {
                     modePicker
                 }
+                ToolbarItem(placement: .primaryAction) {
+                    toolbarButtons
+                }
             }
         }
+    }
+
+    // MARK: - Toolbar Buttons (hidden shortcuts + export)
+
+    private var toolbarButtons: some View {
+        HStack(spacing: 4) {
+            // Hidden buttons for keyboard shortcuts (Cmd+1 / Cmd+2)
+            Button("Sessions") {
+                mode = .sessions
+            }
+            .keyboardShortcut("1", modifiers: .command)
+            .hidden()
+            .frame(width: 0, height: 0)
+
+            Button("Overview") {
+                mode = .overview
+            }
+            .keyboardShortcut("2", modifiers: .command)
+            .hidden()
+            .frame(width: 0, height: 0)
+
+            // Export button
+            Button {
+                exportCurrentSession()
+            } label: {
+                Label("Export", systemImage: "square.and.arrow.up")
+            }
+            .keyboardShortcut("e", modifiers: .command)
+            .disabled(!canExport)
+            .help("Export session to Markdown")
+        }
+    }
+
+    // MARK: - Export
+
+    private func exportCurrentSession() {
+        guard let store = sessionStore,
+              let id = selectedSessionId,
+              let rs = store.rootSessions.first(where: { $0.id == id }),
+              !store.loadedTurns.isEmpty else { return }
+
+        let markdown = SessionExporter.exportToMarkdown(rootSession: rs, turns: store.loadedTurns)
+        let safeName = rs.projectName.replacingOccurrences(of: "/", with: "-")
+        let suggestedName = "\(safeName)-session.md"
+        SessionExporter.saveWithPanel(markdown: markdown, suggestedName: suggestedName)
     }
 
     // MARK: - Navigation
@@ -135,6 +229,10 @@ struct SessionWindowView: View {
             result = result.filter { $0.projectPath == filter }
         }
 
+        if let cutoff = dateFilter.cutoffDate() {
+            result = result.filter { $0.lastActivityAt >= cutoff }
+        }
+
         if !searchText.isEmpty {
             let query = searchText.lowercased()
             result = result.filter {
@@ -161,65 +259,75 @@ struct SessionWindowView: View {
     private var sidebar: some View {
         VStack(spacing: 0) {
             // Search + filter bar
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.tertiary)
-                    .font(.caption)
-                TextField("Search sessions...", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .font(.caption)
-                if !searchText.isEmpty {
-                    Button {
-                        searchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                    }
-                    .buttonStyle(.plain)
-                }
-                if uniqueProjects.count > 1 {
-                    Menu {
+            VStack(spacing: 6) {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.tertiary)
+                        .font(.caption)
+                    TextField("Search sessions...", text: $searchText)
+                        .textFieldStyle(.plain)
+                        .font(.caption)
+                    if !searchText.isEmpty {
                         Button {
-                            projectFilter = nil
+                            searchText = ""
                         } label: {
-                            if projectFilter == nil {
-                                Label("All", systemImage: "checkmark")
-                            } else {
-                                Text("All")
-                            }
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
                         }
-                        Divider()
-                        ForEach(uniqueProjects, id: \.path) { project in
+                        .buttonStyle(.plain)
+                    }
+                    if uniqueProjects.count > 1 {
+                        Menu {
                             Button {
-                                projectFilter = project.path
+                                setProjectFilter(nil)
                             } label: {
-                                if projectFilter == project.path {
-                                    Label(project.name, systemImage: "checkmark")
+                                if projectFilter == nil {
+                                    Label("All", systemImage: "checkmark")
                                 } else {
-                                    Text(project.name)
+                                    Text("All")
                                 }
                             }
+                            Divider()
+                            ForEach(uniqueProjects, id: \.path) { project in
+                                Button {
+                                    setProjectFilter(project.path)
+                                } label: {
+                                    if projectFilter == project.path {
+                                        Label(project.name, systemImage: "checkmark")
+                                    } else {
+                                        Text(project.name)
+                                    }
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 2) {
+                                Text(selectedProjectName)
+                                    .lineLimit(1)
+                                Image(systemName: "chevron.up.chevron.down")
+                            }
+                            .font(.caption2)
+                            .foregroundStyle(projectFilter != nil ? .primary : .secondary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(.quaternary, in: Capsule())
                         }
-                    } label: {
-                        HStack(spacing: 2) {
-                            Text(selectedProjectName)
-                                .lineLimit(1)
-                            Image(systemName: "chevron.up.chevron.down")
-                        }
-                        .font(.caption2)
-                        .foregroundStyle(projectFilter != nil ? .primary : .secondary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(.quaternary, in: Capsule())
+                        .menuStyle(.borderlessButton)
+                        .fixedSize()
                     }
-                    .menuStyle(.borderlessButton)
-                    .fixedSize()
                 }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
+
+                // Date filter picker
+                Picker("Date", selection: $dateFilter) {
+                    ForEach(DateFilter.allCases, id: \.self) { filter in
+                        Text(filter.rawValue).tag(filter)
+                    }
+                }
+                .pickerStyle(.segmented)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
 
@@ -251,7 +359,7 @@ struct SessionWindowView: View {
                     Spacer()
                 }
                 .frame(maxWidth: .infinity)
-            } else if displayRootSessions.isEmpty && searchText.isEmpty {
+            } else if displayRootSessions.isEmpty && searchText.isEmpty && dateFilter == .all {
                 ContentUnavailableView {
                     Label("No Sessions", systemImage: "bubble.left.and.bubble.right")
                 } description: {
@@ -260,7 +368,7 @@ struct SessionWindowView: View {
             } else {
                 List(selection: $selectedSessionId) {
                     if displayRootSessions.isEmpty {
-                        Text("No sessions match your search")
+                        Text("No sessions match your filters")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .center)
@@ -299,7 +407,7 @@ struct SessionWindowView: View {
             Text("\(stats.totalMessages.formattedCount) msgs")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-            Text("·")
+            Text("\u{00B7}")
                 .foregroundStyle(.quaternary)
             Text("\(stats.totalInputTokens.formattedCount) in")
                 .font(.caption2)
@@ -348,3 +456,4 @@ struct SessionWindowView: View {
         }
     }
 }
+

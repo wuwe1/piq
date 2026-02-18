@@ -8,6 +8,7 @@ struct StatsOverviewView: View {
 
     @State private var selectedDay: Date?
     @State private var selectedModelDay: Date?
+    @State private var selectedCostDay: Date?
     @State private var selectedHour: Date?
 
     init(stats: ClaudeStats, sessions: [SessionEntry], statsCache: StatsCache? = nil) {
@@ -28,6 +29,7 @@ struct StatsOverviewView: View {
                 dailyActivityChart
                 if statsCache != nil {
                     dailyModelTokensChart
+                    dailyCostChart
                 }
                 activeHoursChart
                 modelUsageChart
@@ -229,6 +231,93 @@ struct StatsOverviewView: View {
         if model.contains("sonnet") { return "Sonnet" }
         if model.contains("haiku") { return "Haiku" }
         return model
+    }
+
+    // MARK: - Daily Cost
+
+    /// A single day's estimated API cost.
+    private struct DailyCostEntry: Identifiable {
+        let id = UUID()
+        let date: Date
+        let cost: Double
+    }
+
+    private var dailyCostChart: some View {
+        let entries: [DailyCostEntry] = {
+            guard let cache = statsCache else { return [] }
+            let df = DateFormatter()
+            df.dateFormat = "yyyy-MM-dd"
+            df.locale = Locale(identifier: "en_US_POSIX")
+            return cache.dailyModelTokens.compactMap { day -> DailyCostEntry? in
+                guard let date = df.date(from: day.date) else { return nil }
+                let dayCost = day.tokensByModel.reduce(0.0) { sum, pair in
+                    guard !pair.key.hasPrefix("<") else { return sum }
+                    return sum + ModelStats.outputCost(model: pair.key, tokens: pair.value)
+                }
+                guard dayCost > 0 else { return nil }
+                return DailyCostEntry(date: date, cost: dayCost)
+            }
+        }()
+
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("Daily Cost (Output)")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+
+            Chart {
+                ForEach(entries) { entry in
+                    AreaMark(
+                        x: .value("Date", entry.date, unit: .day),
+                        y: .value("Cost", entry.cost)
+                    )
+                    .foregroundStyle(.orange.opacity(0.3).gradient)
+                    .interpolationMethod(.catmullRom)
+
+                    LineMark(
+                        x: .value("Date", entry.date, unit: .day),
+                        y: .value("Cost", entry.cost)
+                    )
+                    .foregroundStyle(.orange)
+                    .interpolationMethod(.catmullRom)
+                    .lineStyle(StrokeStyle(lineWidth: 2))
+                }
+
+                if let info = dailyCostTooltipInfo(entries: entries) {
+                    RuleMark(x: .value("Selected", info.date, unit: .day))
+                        .foregroundStyle(.secondary.opacity(0.3))
+                        .annotation(position: .top, spacing: 4, overflowResolution: .init(x: .fit, y: .disabled)) {
+                            chartTooltip(
+                                title: formatDate(info.date),
+                                value: String(format: "$%.2f", info.cost)
+                            )
+                        }
+                }
+            }
+            .chartXSelection(value: $selectedCostDay)
+            .chartXAxis {
+                AxisMarks(values: .stride(by: .day, count: 7)) { _ in
+                    AxisGridLine()
+                    AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+                }
+            }
+            .chartYAxis {
+                AxisMarks(position: .leading) { _ in
+                    AxisGridLine()
+                    AxisValueLabel()
+                }
+            }
+            .chartXScale(range: .plotDimension(padding: 12))
+            .frame(height: 160)
+        }
+        .padding(16)
+        .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func dailyCostTooltipInfo(entries: [DailyCostEntry]) -> (date: Date, cost: Double)? {
+        guard let selected = selectedCostDay else { return nil }
+        let cal = Calendar.current
+        guard let match = entries.first(where: { cal.isDate($0.date, inSameDayAs: selected) }) else { return nil }
+        return (date: cal.startOfDay(for: selected), cost: match.cost)
     }
 
     // MARK: - Active Hours

@@ -15,6 +15,8 @@ struct MarkdownTextView: View {
                     codeBlockView(language: lang, code: code)
                 case .table(let table):
                     tableView(table)
+                case .blockquote(let depth, let content):
+                    blockquoteView(depth: depth, content: content)
                 }
             }
         }
@@ -27,6 +29,7 @@ struct MarkdownTextView: View {
         case text(String)
         case codeBlock(language: String?, code: String)
         case table(ParsedTable)
+        case blockquote(depth: Int, content: String)
     }
 
     private struct ParsedTable {
@@ -56,6 +59,8 @@ struct MarkdownTextView: View {
         var codeLang: String?
         var codeLines: [String] = []
         var tableLines: [String] = []
+        var quoteLines: [String] = []
+        var quoteDepth = 0
 
         let lines = text.components(separatedBy: "\n")
 
@@ -88,8 +93,30 @@ struct MarkdownTextView: View {
             tableLines = []
         }
 
+        func flushBlockquote() {
+            guard !quoteLines.isEmpty else { return }
+            let content = quoteLines.joined(separator: "\n")
+            result.append(.blockquote(depth: quoteDepth, content: content))
+            quoteLines = []
+            quoteDepth = 0
+        }
+
+        /// Returns (depth, strippedContent) if the line is a blockquote, nil otherwise.
+        func parseBlockquoteLine(_ line: String) -> (Int, String)? {
+            var depth = 0
+            var rest = line[line.startIndex...]
+            while rest.hasPrefix(">") {
+                depth += 1
+                rest = rest.dropFirst()
+                if rest.hasPrefix(" ") { rest = rest.dropFirst() }
+            }
+            guard depth > 0 else { return nil }
+            return (depth, String(rest))
+        }
+
         for line in lines {
             if !inCode && line.hasPrefix("```") {
+                flushBlockquote()
                 flushTable()
                 flushText()
                 inCode = true
@@ -103,10 +130,24 @@ struct MarkdownTextView: View {
                 codeLines = []
             } else if inCode {
                 codeLines.append(line)
+            } else if let (depth, content) = parseBlockquoteLine(line) {
+                if !tableLines.isEmpty { flushTable() }
+                // If depth changes, flush previous blockquote group
+                if !quoteLines.isEmpty && depth != quoteDepth {
+                    flushText()
+                    flushBlockquote()
+                }
+                if quoteLines.isEmpty {
+                    flushText()
+                    quoteDepth = depth
+                }
+                quoteLines.append(content)
             } else if isTableLine(line) {
+                flushBlockquote()
                 if tableLines.isEmpty { flushText() }
                 tableLines.append(line)
             } else {
+                flushBlockquote()
                 if !tableLines.isEmpty { flushTable() }
                 if !current.isEmpty { current += "\n" }
                 current += line
@@ -116,6 +157,7 @@ struct MarkdownTextView: View {
         if inCode {
             result.append(.codeBlock(language: codeLang, code: codeLines.joined(separator: "\n")))
         } else {
+            flushBlockquote()
             if !tableLines.isEmpty { flushTable() }
             flushText()
         }
@@ -253,6 +295,10 @@ struct MarkdownTextView: View {
                 }
             }
 
+            // Compute indentation level for nested lists
+            let leadingSpaces = line.prefix(while: { $0 == " " || $0 == "\t" }).count
+            let nestLevel = leadingSpaces / 2 // 2 spaces per nesting level
+
             if trimmed.hasPrefix("### ") {
                 var seg = styledInline(String(trimmed.dropFirst(4)), baseFont: .subheadline)
                 seg.inlinePresentationIntent = .stronglyEmphasized
@@ -266,12 +312,16 @@ struct MarkdownTextView: View {
                 seg.inlinePresentationIntent = .stronglyEmphasized
                 result.append(seg)
             } else if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") {
-                var bullet = AttributedString("  \u{2022} ")
+                let indent = String(repeating: "    ", count: nestLevel)
+                let bullets = ["\u{2022}", "\u{25E6}", "\u{2023}"] // bullet, circle, triangle
+                let bulletChar = bullets[min(nestLevel, bullets.count - 1)]
+                var bullet = AttributedString("  \(indent)\(bulletChar) ")
                 bullet.foregroundColor = .secondary
                 result.append(bullet)
                 result.append(styledInline(String(trimmed.dropFirst(2))))
             } else if let match = trimmed.wholeMatch(of: /^(\d+)\.\s+(.+)$/) {
-                var num = AttributedString("  \(match.1). ")
+                let indent = String(repeating: "    ", count: nestLevel)
+                var num = AttributedString("  \(indent)\(match.1). ")
                 num.foregroundColor = .secondary
                 result.append(num)
                 result.append(styledInline(String(match.2)))
@@ -310,6 +360,26 @@ struct MarkdownTextView: View {
         }
 
         return attr
+    }
+
+    // MARK: - Blockquote
+
+    private func blockquoteView(depth: Int, content: String) -> some View {
+        let barColor: Color = depth <= 1 ? .blue.opacity(0.5) : .gray.opacity(0.4)
+        return HStack(alignment: .top, spacing: 0) {
+            // Render nested bars for each depth level
+            ForEach(0..<depth, id: \.self) { level in
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(level == 0 ? Color.blue.opacity(0.5) : Color.gray.opacity(0.4))
+                    .frame(width: 3)
+                    .padding(.trailing, 8)
+            }
+            // Recursively render inner content using MarkdownTextView
+            MarkdownTextView(text: content)
+        }
+        .padding(.leading, 4)
+        .padding(.vertical, 2)
+        .background(barColor.opacity(0.05))
     }
 
     // MARK: - Code Block

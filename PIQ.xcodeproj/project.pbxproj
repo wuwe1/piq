@@ -34,6 +34,12 @@
 		A1000064 /* StatsOverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000064 /* StatsOverviewView.swift */; };
 		A1000065 /* MarkdownTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000065 /* MarkdownTextView.swift */; };
 		A1000066 /* ReadState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000066 /* ReadState.swift */; };
+		AA200001 /* SessionExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100001 /* SessionExporter.swift */; };
+		AA200002 /* DiffEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100002 /* DiffEngine.swift */; };
+		AA200003 /* ToolContentViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100003 /* ToolContentViews.swift */; };
+		AA200004 /* ComputeUserTurnsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100004 /* ComputeUserTurnsTests.swift */; };
+		AA200005 /* DiffTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100005 /* DiffTests.swift */; };
+		AA200006 /* SessionParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100006 /* SessionParserTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -77,6 +83,12 @@
 		A2000070 /* ScreenshotGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotGenerator.swift; sourceTree = "<group>"; };
 		A2000080 /* ScreenshotGenerationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotGenerationTests.swift; sourceTree = "<group>"; };
 		A2000066 /* ReadState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadState.swift; sourceTree = "<group>"; };
+		AA100001 /* SessionExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionExporter.swift; sourceTree = "<group>"; };
+		AA100002 /* DiffEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiffEngine.swift; sourceTree = "<group>"; };
+		AA100003 /* ToolContentViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolContentViews.swift; sourceTree = "<group>"; };
+		AA100004 /* ComputeUserTurnsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComputeUserTurnsTests.swift; sourceTree = "<group>"; };
+		AA100005 /* DiffTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiffTests.swift; sourceTree = "<group>"; };
+		AA100006 /* SessionParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionParserTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -144,6 +156,8 @@
 				A2000063 /* SessionToolCallView.swift */,
 				A2000064 /* StatsOverviewView.swift */,
 				A2000065 /* MarkdownTextView.swift */,
+				AA100002 /* DiffEngine.swift */,
+				AA100003 /* ToolContentViews.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -167,6 +181,7 @@
 				A2000054 /* SessionScanner.swift */,
 				A2000055 /* SessionFileWatcher.swift */,
 				A2000056 /* SessionStore.swift */,
+				AA100001 /* SessionExporter.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -192,6 +207,9 @@
 			isa = PBXGroup;
 			children = (
 				A2000080 /* ScreenshotGenerationTests.swift */,
+				AA100004 /* ComputeUserTurnsTests.swift */,
+				AA100005 /* DiffTests.swift */,
+				AA100006 /* SessionParserTests.swift */,
 			);
 			path = PIQTests;
 			sourceTree = "<group>";
@@ -321,6 +339,9 @@
 				A1000065 /* MarkdownTextView.swift in Sources */,
 				A1000070 /* ScreenshotGenerator.swift in Sources */,
 				A1000066 /* ReadState.swift in Sources */,
+				AA200001 /* SessionExporter.swift in Sources */,
+				AA200002 /* DiffEngine.swift in Sources */,
+				AA200003 /* ToolContentViews.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -329,6 +350,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1000080 /* ScreenshotGenerationTests.swift in Sources */,
+				AA200004 /* ComputeUserTurnsTests.swift in Sources */,
+				AA200005 /* DiffTests.swift in Sources */,
+				AA200006 /* SessionParserTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

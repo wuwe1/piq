@@ -7,6 +7,7 @@ struct SessionTurnListView: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var userTurns: [UserTurnItem] = []
+    @State private var searchText: String = ""
 
     struct UserTurnItem: Identifiable {
         let id: String          // turn.id
@@ -20,6 +21,29 @@ struct SessionTurnListView: View {
     var body: some View {
         VStack(spacing: 0) {
             sessionHeader
+            Divider()
+
+            HStack(spacing: 4) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.tertiary)
+                    .font(.caption)
+                TextField("Search turns...", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(.caption)
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.tertiary)
+                            .font(.caption)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(.bar)
             Divider()
 
             if store.isLoadingDetail {
@@ -43,6 +67,17 @@ struct SessionTurnListView: View {
                let item = userTurns.first(where: { $0.globalIndex == idx }) {
                 store.selectedTurns = item.allTurns
             }
+        }
+    }
+
+    private var filteredTurns: [UserTurnItem] {
+        guard !searchText.isEmpty else { return userTurns }
+        let query = searchText.lowercased()
+        return userTurns.filter { item in
+            if item.text.lowercased().contains(query) { return true }
+            if let preview = assistantPreview(item.turn),
+               preview.lowercased().contains(query) { return true }
+            return false
         }
     }
 
@@ -121,8 +156,9 @@ struct SessionTurnListView: View {
     }
 
     private var turnList: some View {
-        List {
-            ForEach(userTurns.reversed()) { item in
+        let reversedTurns = filteredTurns.reversed() as [UserTurnItem]
+        return List {
+            ForEach(reversedTurns) { item in
                 let isSelected = store.selectedTurnIndex == item.globalIndex
                 turnRow(item)
                     .listRowBackground(
@@ -138,6 +174,41 @@ struct SessionTurnListView: View {
             }
         }
         .listStyle(.inset)
+        .onKeyPress(.upArrow) {
+            navigateTurn(direction: .up, in: reversedTurns)
+        }
+        .onKeyPress(.downArrow) {
+            navigateTurn(direction: .down, in: reversedTurns)
+        }
+    }
+
+    private enum NavigationDirection {
+        case up, down
+    }
+
+    private func navigateTurn(direction: NavigationDirection, in reversedTurns: [UserTurnItem]) -> KeyPress.Result {
+        guard !reversedTurns.isEmpty else { return .ignored }
+
+        guard let currentIndex = store.selectedTurnIndex,
+              let currentPos = reversedTurns.firstIndex(where: { $0.globalIndex == currentIndex }) else {
+            // Nothing selected: select the first item (most recent)
+            turnIndexBinding.wrappedValue = reversedTurns.first?.globalIndex
+            return .handled
+        }
+
+        let nextPos: Int
+        switch direction {
+        case .up:
+            // Up moves toward older turns (higher index in reversedTurns)
+            nextPos = currentPos + 1
+        case .down:
+            // Down moves toward newer turns (lower index in reversedTurns)
+            nextPos = currentPos - 1
+        }
+
+        guard reversedTurns.indices.contains(nextPos) else { return .ignored }
+        turnIndexBinding.wrappedValue = reversedTurns[nextPos].globalIndex
+        return .handled
     }
 
     // MARK: - Turn Row

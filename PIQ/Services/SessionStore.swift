@@ -18,6 +18,18 @@ struct ModelStats: Identifiable, Sendable {
     let cacheCreationTokens: Int
     var totalTokens: Int { inputTokens + outputTokens }
 
+    /// Per-MTok pricing in USD: (input, output, cacheRead, cacheWrite).
+    /// Rates sourced from Anthropic's published API pricing.
+    static let pricingTable: [String: (input: Double, output: Double, cacheRead: Double, cacheWrite: Double)] = [
+        "opus":   (15,   75,  1.50,  18.75),
+        "sonnet": ( 3,   15,  0.30,   3.75),
+        "haiku":  ( 0.80, 4,  0.08,   1.0),
+    ]
+
+    /// Default rates when model family cannot be determined (uses opus pricing).
+    private static let defaultRates: (input: Double, output: Double, cacheRead: Double, cacheWrite: Double) =
+        (15, 75, 1.50, 18.75)
+
     /// Estimated API cost in USD based on published per-token pricing.
     var estimatedCost: Double {
         let rates = Self.pricingRates(for: model)
@@ -27,15 +39,19 @@ struct ModelStats: Identifiable, Sendable {
             + Double(cacheCreationTokens) * rates.cacheWrite / 1_000_000
     }
 
-    private static func pricingRates(for model: String) -> (input: Double, output: Double, cacheRead: Double, cacheWrite: Double) {
-        if model.contains("opus") {
-            return (15, 75, 1.50, 18.75)
-        } else if model.contains("sonnet") {
-            return (3, 15, 0.30, 3.75)
-        } else if model.contains("haiku") {
-            return (0.80, 4, 0.08, 1.0)
+    /// Look up per-MTok pricing rates for a model identifier.
+    static func pricingRates(for model: String) -> (input: Double, output: Double, cacheRead: Double, cacheWrite: Double) {
+        let lowered = model.lowercased()
+        for (key, rates) in pricingTable where lowered.contains(key) {
+            return rates
         }
-        return (15, 75, 1.50, 18.75) // default to opus pricing
+        return defaultRates
+    }
+
+    /// Compute the output-token cost in USD for a given model and token count.
+    static func outputCost(model: String, tokens: Int) -> Double {
+        let rates = pricingRates(for: model)
+        return Double(tokens) * rates.output / 1_000_000
     }
 }
 
