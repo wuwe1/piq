@@ -205,6 +205,13 @@ final class SessionStore {
     private(set) var loadedSessionId: String?
     private(set) var isLoadingDetail = false
 
+    /// Incremented every time `loadedTurns` is assigned, so views can detect
+    /// content changes even when the turn count stays the same.
+    private(set) var loadedTurnsVersion: Int = 0
+
+    /// In-memory cache of parsed turns keyed by root session ID.
+    private var turnsCache: [String: [SessionTurn]] = [:]
+
     /// Currently selected turn index within loadedTurns.
     var selectedTurnIndex: Int? = nil
 
@@ -310,6 +317,13 @@ final class SessionStore {
                 self.statsCache = cache
                 self.recomputeRootSessions()
                 self.recomputeUnreadCounts()
+
+                // Invalidate turnsCache for any session whose files changed
+                for rs in self.rootSessions {
+                    if rs.entries.contains(where: { result.changedFiles.contains($0.jsonlURL) }) {
+                        self.turnsCache.removeValue(forKey: rs.id)
+                    }
+                }
 
                 // Refresh detail if loaded session changed
                 if let loadedId = self.loadedSessionId,
@@ -424,7 +438,18 @@ final class SessionStore {
     /// Load full session detail (turns) for a RootSession (all continuations merged).
     func loadSessionDetail(rootSession: RootSession, isRefresh: Bool = false) async {
         loadedSessionId = rootSession.id
-        if !isRefresh {
+
+        // If switching sessions and we have a cached result, show it immediately
+        if !isRefresh, let cached = turnsCache[rootSession.id] {
+            loadedTurns = cached
+            loadedTurnsVersion += 1
+            isLoadingDetail = false
+            selectedTurnIndex = nil
+            selectedTurns = []
+            if !cached.isEmpty {
+                selectedTurnIndex = cached.count - 1
+            }
+        } else if !isRefresh {
             isLoadingDetail = true
             loadedTurns = []
             selectedTurnIndex = nil
@@ -470,7 +495,9 @@ final class SessionStore {
 
         // Only update if we're still viewing this session
         if loadedSessionId == rootSession.id {
+            turnsCache[rootSession.id] = turns
             loadedTurns = turns
+            loadedTurnsVersion += 1
             isLoadingDetail = false
             // Default to selecting the last turn
             if !turns.isEmpty && selectedTurnIndex == nil {

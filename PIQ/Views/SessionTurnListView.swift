@@ -35,7 +35,7 @@ struct SessionTurnListView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onChange(of: store.loadedTurns.count, initial: true) { _, _ in
+        .onChange(of: store.loadedTurnsVersion, initial: true) { _, _ in
             userTurns = Self.computeUserTurns(from: store.loadedTurns)
             // Sync selectedTurns for auto-selected turn (e.g. on initial load)
             if let idx = store.selectedTurnIndex,
