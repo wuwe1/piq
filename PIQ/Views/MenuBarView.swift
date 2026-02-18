@@ -5,7 +5,7 @@ struct MenuBarView: View {
     @Environment(\.openWindow) private var openWindow
     @State private var searchText = ""
     @State private var projectFilter: String?
-    @State private var displaySessions: [SessionEntry] = []
+    @State private var displayRootSessions: [RootSession] = []
 
     private var sessionStore: SessionStore? { appState.sessionStore }
 
@@ -13,9 +13,9 @@ struct MenuBarView: View {
         guard let store = sessionStore else { return [] }
         var seen = Set<String>()
         var result: [(path: String, name: String)] = []
-        for session in store.sessions {
-            if !session.projectPath.isEmpty && seen.insert(session.projectPath).inserted {
-                result.append((session.projectPath, session.projectName))
+        for rs in store.rootSessions {
+            if !rs.projectPath.isEmpty && seen.insert(rs.projectPath).inserted {
+                result.append((rs.projectPath, rs.projectName))
             }
         }
         return result.sorted { $0.name.lowercased() < $1.name.lowercased() }
@@ -23,10 +23,10 @@ struct MenuBarView: View {
 
     private func recomputeFilteredSessions() {
         guard let store = sessionStore else {
-            displaySessions = []
+            displayRootSessions = []
             return
         }
-        var result = store.sessions
+        var result = store.rootSessions
 
         if let filter = projectFilter {
             result = result.filter { $0.projectPath == filter }
@@ -41,7 +41,7 @@ struct MenuBarView: View {
             }
         }
 
-        displaySessions = result
+        displayRootSessions = result
     }
 
     var body: some View {
@@ -54,7 +54,7 @@ struct MenuBarView: View {
             Divider()
             footer
         }
-        .onChange(of: sessionStore?.sessions, initial: true) { _, _ in recomputeFilteredSessions() }
+        .onChange(of: sessionStore?.rootSessions, initial: true) { _, _ in recomputeFilteredSessions() }
         .onChange(of: searchText) { _, _ in recomputeFilteredSessions() }
         .onChange(of: projectFilter) { _, _ in recomputeFilteredSessions() }
     }
@@ -68,7 +68,7 @@ struct MenuBarView: View {
             Text("PIQ")
                 .font(.headline)
             Spacer()
-            Text("\(sessionStore?.sessions.count ?? 0) sessions")
+            Text("\(sessionStore?.rootSessions.count ?? 0) sessions")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
             Button {
@@ -182,7 +182,7 @@ struct MenuBarView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if displaySessions.isEmpty {
+        } else if displayRootSessions.isEmpty {
             VStack(spacing: 12) {
                 Spacer()
                 Image(systemName: "bubble.left.and.bubble.right")
@@ -197,9 +197,9 @@ struct MenuBarView: View {
         } else {
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    ForEach(displaySessions) { session in
-                        sessionRow(session)
-                        if session.id != displaySessions.last?.id {
+                    ForEach(displayRootSessions) { rs in
+                        sessionRow(rs)
+                        if rs.id != displayRootSessions.last?.id {
                             Divider().padding(.horizontal, 12)
                         }
                     }
@@ -208,13 +208,13 @@ struct MenuBarView: View {
         }
     }
 
-    private func sessionRow(_ session: SessionEntry) -> some View {
+    private func sessionRow(_ rs: RootSession) -> some View {
         Button {
-            appState.pendingSessionId = session.id
+            appState.pendingSessionId = rs.id
             NSApp.activate(ignoringOtherApps: true)
             openWindow(id: "main")
         } label: {
-            SessionRowView(entry: session, unreadCount: sessionStore?.unreadCounts[session.id] ?? 0)
+            SessionRowView(rootSession: rs, unreadCount: sessionStore?.unreadCounts[rs.id] ?? 0)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .contentShape(Rectangle())

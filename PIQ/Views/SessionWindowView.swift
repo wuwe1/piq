@@ -1,29 +1,124 @@
 import SwiftUI
 
-/// Sidebar selection: either the stats overview or a specific session.
-enum SidebarSelection: Hashable {
-    case overview
-    case session(String)
+/// Top-level mode: sessions browser or stats overview.
+enum WindowMode: String {
+    case sessions = "Sessions"
+    case overview = "Overview"
 }
 
 /// Root view for the Claude Sessions window.
-/// Uses NavigationSplitView with sidebar list and detail pane.
+/// Toolbar picker switches between Sessions (3-column NavigationSplitView) and Overview (full-width stats).
 struct SessionWindowView: View {
     @Environment(AppState.self) private var appState
-    @State private var selection: SidebarSelection? = .overview
+    @State private var mode: WindowMode = .sessions
+    @State private var selectedSessionId: String?
     @State private var searchText = ""
     @State private var projectFilter: String?
-    @State private var displaySessions: [SessionEntry] = []
+    @State private var displayRootSessions: [RootSession] = []
 
     private var sessionStore: SessionStore? { appState.sessionStore }
+
+    var body: some View {
+        Group {
+            switch mode {
+            case .sessions:
+                sessionsView
+            case .overview:
+                overviewView
+            }
+        }
+        .onAppear {
+            if appState.sessionStore == nil {
+                appState.setupSessionStore()
+            }
+            if let pending = appState.pendingSessionId {
+                navigateToSession(pending)
+                appState.pendingSessionId = nil
+            }
+        }
+        .onChange(of: sessionStore?.rootSessions, initial: true) { _, _ in recomputeFilteredSessions() }
+        .onChange(of: searchText) { _, _ in recomputeFilteredSessions() }
+        .onChange(of: projectFilter) { _, _ in recomputeFilteredSessions() }
+        .onChange(of: appState.pendingSessionId) { _, newValue in
+            guard let pending = newValue else { return }
+            navigateToSession(pending)
+            appState.pendingSessionId = nil
+        }
+    }
+
+    // MARK: - Mode Picker
+
+    private var modePicker: some View {
+        Picker("Mode", selection: $mode) {
+            Label("Sessions", systemImage: "bubble.left.and.bubble.right")
+                .tag(WindowMode.sessions)
+            Label("Overview", systemImage: "chart.bar.xaxis")
+                .tag(WindowMode.overview)
+        }
+        .pickerStyle(.segmented)
+        .fixedSize()
+    }
+
+    // MARK: - Sessions View (3-column)
+
+    private var sessionsView: some View {
+        NavigationSplitView {
+            sidebar
+                .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 380)
+        } content: {
+            turnListColumn
+                .navigationSplitViewColumnWidth(min: 260, ideal: 320, max: 400)
+        } detail: {
+            turnDetailColumn
+        }
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                modePicker
+            }
+        }
+    }
+
+    // MARK: - Overview View (full-width)
+
+    private var overviewView: some View {
+        NavigationStack {
+            Group {
+                if let stats = sessionStore?.stats, let store = sessionStore {
+                    StatsOverviewView(stats: stats, sessions: store.sessions, statsCache: store.statsCache)
+                } else {
+                    ProgressView("Loading...")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    modePicker
+                }
+            }
+        }
+    }
+
+    // MARK: - Navigation
+
+    private func navigateToSession(_ sessionId: String) {
+        mode = .sessions
+        selectedSessionId = sessionId
+        if let rs = sessionStore?.rootSessions.first(where: { $0.id == sessionId }) {
+            Task {
+                await sessionStore?.loadSessionDetail(rootSession: rs)
+            }
+        }
+    }
+
+    // MARK: - Filtering
 
     private var uniqueProjects: [(path: String, name: String)] {
         guard let store = sessionStore else { return [] }
         var seen = Set<String>()
         var result: [(path: String, name: String)] = []
-        for session in store.sessions {
-            if !session.projectPath.isEmpty && seen.insert(session.projectPath).inserted {
-                result.append((session.projectPath, session.projectName))
+        for rs in store.rootSessions {
+            if !rs.projectPath.isEmpty && seen.insert(rs.projectPath).inserted {
+                result.append((rs.projectPath, rs.projectName))
             }
         }
         return result.sorted { $0.name.lowercased() < $1.name.lowercased() }
@@ -31,10 +126,10 @@ struct SessionWindowView: View {
 
     private func recomputeFilteredSessions() {
         guard let store = sessionStore else {
-            displaySessions = []
+            displayRootSessions = []
             return
         }
-        var result = store.sessions
+        var result = store.rootSessions
 
         if let filter = projectFilter {
             result = result.filter { $0.projectPath == filter }
@@ -50,55 +145,7 @@ struct SessionWindowView: View {
             }
         }
 
-        displaySessions = result
-    }
-
-    var body: some View {
-        NavigationSplitView {
-            sidebar
-                .navigationSplitViewColumnWidth(min: 280, ideal: 320, max: 400)
-        } detail: {
-            detail
-        }
-        .onAppear {
-            if appState.sessionStore == nil {
-                appState.setupSessionStore()
-            }
-            // Pick up pending selection from menubar click
-            if let pending = appState.pendingSessionId {
-                selection = .session(pending)
-                appState.pendingSessionId = nil
-                if let entry = sessionStore?.sessions.first(where: { $0.id == pending }) {
-                    Task {
-                        await sessionStore?.loadSessionDetail(entry: entry)
-                    }
-                }
-            }
-        }
-        .onChange(of: sessionStore?.sessions, initial: true) { _, _ in recomputeFilteredSessions() }
-        .onChange(of: searchText) { _, _ in recomputeFilteredSessions() }
-        .onChange(of: projectFilter) { _, _ in recomputeFilteredSessions() }
-        .onChange(of: appState.pendingSessionId) { _, newValue in
-            guard let pending = newValue else { return }
-            selection = .session(pending)
-            appState.pendingSessionId = nil
-            if let entry = sessionStore?.sessions.first(where: { $0.id == pending }) {
-                Task {
-                    await sessionStore?.loadSessionDetail(entry: entry)
-                }
-            }
-        }
-    }
-
-    // MARK: - Navigation
-
-    private func navigateToSession(_ fileId: String) {
-        selection = .session(fileId)
-        if let entry = sessionStore?.sessions.first(where: { $0.id == fileId }) {
-            Task {
-                await sessionStore?.loadSessionDetail(entry: entry)
-            }
-        }
+        displayRootSessions = result
     }
 
     // MARK: - Sidebar
@@ -179,7 +226,7 @@ struct SessionWindowView: View {
             Divider()
 
             // Session list
-            if sessionStore?.isLoading == true && displaySessions.isEmpty {
+            if sessionStore?.isLoading == true && displayRootSessions.isEmpty {
                 VStack(spacing: 8) {
                     Spacer()
                     if let p = sessionStore?.scanProgress,
@@ -204,40 +251,33 @@ struct SessionWindowView: View {
                     Spacer()
                 }
                 .frame(maxWidth: .infinity)
-            } else if displaySessions.isEmpty && searchText.isEmpty {
+            } else if displayRootSessions.isEmpty && searchText.isEmpty {
                 ContentUnavailableView {
                     Label("No Sessions", systemImage: "bubble.left.and.bubble.right")
                 } description: {
                     Text("Claude Code sessions will appear here")
                 }
             } else {
-                List(selection: $selection) {
-                    Label("Overview", systemImage: "chart.bar.xaxis")
-                        .tag(SidebarSelection.overview)
-
-                    Section {
-                        if displaySessions.isEmpty {
-                            Text("No sessions match your search")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .center)
-                                .padding(.vertical, 8)
-                        } else {
-                            ForEach(displaySessions) { session in
-                                SessionRowView(entry: session, unreadCount: sessionStore?.unreadCounts[session.id] ?? 0, isSelected: selection == .session(session.id))
-                                    .tag(SidebarSelection.session(session.id))
-                            }
+                List(selection: $selectedSessionId) {
+                    if displayRootSessions.isEmpty {
+                        Text("No sessions match your search")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, 8)
+                    } else {
+                        ForEach(displayRootSessions) { rs in
+                            SessionRowView(rootSession: rs, unreadCount: sessionStore?.unreadCounts[rs.id] ?? 0, isSelected: selectedSessionId == rs.id)
+                                .tag(rs.id)
                         }
-                    } header: {
-                        Text("Sessions")
                     }
                 }
                 .listStyle(.sidebar)
-                .onChange(of: selection) { _, newValue in
-                    if case .session(let id) = newValue,
-                       let entry = displaySessions.first(where: { $0.id == id }) {
+                .onChange(of: selectedSessionId) { _, newValue in
+                    if let id = newValue,
+                       let rs = displayRootSessions.first(where: { $0.id == id }) {
                         Task {
-                            await sessionStore?.loadSessionDetail(entry: entry)
+                            await sessionStore?.loadSessionDetail(rootSession: rs)
                         }
                     } else {
                         sessionStore?.clearDetail()
@@ -273,38 +313,38 @@ struct SessionWindowView: View {
         .padding(.vertical, 8)
     }
 
-    // MARK: - Detail
+    // MARK: - Turn List Column (Column 2)
 
     @ViewBuilder
-    private var detail: some View {
-        switch selection {
-        case .session(let id):
-            if let store = sessionStore,
-               let entry = displaySessions.first(where: { $0.id == id }) {
-                SessionDetailView(
-                    entry: entry,
-                    sessions: store.sessions,
-                    store: store,
-                    onNavigate: { targetId in
-                        navigateToSession(targetId)
-                    }
-                )
-            }
-        case .overview:
-            if let stats = sessionStore?.stats, let store = sessionStore {
-                StatsOverviewView(stats: stats, sessions: store.sessions, statsCache: store.statsCache)
-            }
-        case nil:
-            if let stats = sessionStore?.stats, let store = sessionStore {
-                StatsOverviewView(stats: stats, sessions: store.sessions, statsCache: store.statsCache)
-            } else {
-                ContentUnavailableView {
-                    Label("Select a Session", systemImage: "bubble.left.and.bubble.right")
-                } description: {
-                    Text("Choose a session from the sidebar to view its conversation")
-                }
+    private var turnListColumn: some View {
+        if let id = selectedSessionId,
+           let store = sessionStore,
+           let rs = displayRootSessions.first(where: { $0.id == id }) {
+            SessionTurnListView(store: store, rootSession: rs)
+        } else {
+            ContentUnavailableView {
+                Label("Select a Session", systemImage: "bubble.left.and.bubble.right")
+            } description: {
+                Text("Choose a session from the sidebar")
             }
         }
     }
 
+    // MARK: - Turn Detail Column (Column 3)
+
+    @ViewBuilder
+    private var turnDetailColumn: some View {
+        if let store = sessionStore,
+           !store.selectedTurns.isEmpty {
+            SessionTurnDetailView(turns: store.selectedTurns)
+        } else if selectedSessionId != nil {
+            ContentUnavailableView {
+                Label("Select a Turn", systemImage: "text.bubble")
+            } description: {
+                Text("Choose a turn from the list to view its content")
+            }
+        } else {
+            Color.clear
+        }
+    }
 }

@@ -165,6 +165,12 @@ enum ScreenshotMockData {
         ]
     }
 
+    static func rootSessions() -> [RootSession] {
+        sessions().map { entry in
+            RootSession(id: entry.sessionId, entries: [entry])
+        }
+    }
+
     static func stats() -> ClaudeStats {
         let df = DateFormatter()
         df.dateFormat = "yyyy-MM-dd"
@@ -273,7 +279,7 @@ private struct MenuBarShowcase: View {
     }
 
     private var menuBarContent: some View {
-        let sessions = ScreenshotMockData.sessions()
+        let rootSessions = ScreenshotMockData.rootSessions()
         return VStack(spacing: 0) {
             // Header
             HStack {
@@ -282,7 +288,7 @@ private struct MenuBarShowcase: View {
                 Text("PIQ")
                     .font(.headline)
                 Spacer()
-                Text("\(sessions.count) sessions")
+                Text("\(rootSessions.count) sessions")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                 Image(systemName: "arrow.clockwise")
@@ -314,11 +320,11 @@ private struct MenuBarShowcase: View {
 
             // Session list
             VStack(spacing: 0) {
-                ForEach(sessions) { session in
-                    SessionRowView(entry: session)
+                ForEach(rootSessions) { rs in
+                    SessionRowView(rootSession: rs)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                    if session.id != sessions.last?.id {
+                    if rs.id != rootSessions.last?.id {
                         Divider().padding(.horizontal, 12)
                     }
                 }

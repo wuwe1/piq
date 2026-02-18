@@ -6,7 +6,7 @@ private nonisolated(unsafe) let relativeTimeTimer = Timer.publish(every: 60, on:
 
 /// A single row in the session list sidebar.
 struct SessionRowView: View {
-    let entry: SessionEntry
+    let rootSession: RootSession
     var unreadCount: Int = 0
     var isSelected: Bool = false
 
@@ -16,10 +16,18 @@ struct SessionRowView: View {
         VStack(alignment: .leading, spacing: 4) {
             // Top line: project name + badge
             HStack {
-                Text(entry.projectName)
+                Text(rootSession.projectName)
                     .font(.caption)
                     .foregroundStyle(isSelected ? .white.opacity(0.7) : .secondary)
                     .lineLimit(1)
+                if rootSession.continuationCount > 1 {
+                    Text("\(rootSession.continuationCount)")
+                        .font(.system(size: 8, weight: .bold, design: .rounded))
+                        .foregroundStyle(isSelected ? .white.opacity(0.7) : .orange)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(isSelected ? .white.opacity(0.15) : .orange.opacity(0.12), in: Capsule())
+                }
                 Spacer()
             }
             .overlay(alignment: .topTrailing) {
@@ -33,24 +41,24 @@ struct SessionRowView: View {
                 // First user prompt
                 previewLine(
                     icon: "bubble.right",
-                    text: entry.firstPrompt.isEmpty ? "(no prompt)" : entry.firstPrompt,
+                    text: rootSession.firstPrompt.isEmpty ? "(no prompt)" : rootSession.firstPrompt,
                     style: isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.primary)
                 )
 
                 // Last user prompt (only if different from first)
-                if !entry.lastPrompt.isEmpty && entry.lastPrompt != entry.firstPrompt {
+                if !rootSession.lastPrompt.isEmpty && rootSession.lastPrompt != rootSession.firstPrompt {
                     previewLine(
                         icon: "bubble.right.fill",
-                        text: entry.lastPrompt,
+                        text: rootSession.lastPrompt,
                         style: isSelected ? AnyShapeStyle(.white.opacity(0.8)) : AnyShapeStyle(.primary.opacity(0.7))
                     )
                 }
 
                 // Last assistant output
-                if !entry.lastOutput.isEmpty {
+                if !rootSession.lastOutput.isEmpty {
                     previewLine(
                         icon: "sparkles",
-                        text: entry.lastOutput,
+                        text: rootSession.lastOutput,
                         style: isSelected ? AnyShapeStyle(.white.opacity(0.7)) : AnyShapeStyle(.secondary)
                     )
                 }
@@ -58,31 +66,31 @@ struct SessionRowView: View {
 
             // Bottom line: metadata badges + time
             HStack(spacing: 6) {
-                if !entry.model.isEmpty {
-                    metaBadge(text: entry.model.shortModelName, color: .purple)
+                if !rootSession.model.isEmpty {
+                    metaBadge(text: rootSession.model.shortModelName, color: .purple)
                 }
-                if !entry.gitBranch.isEmpty {
+                if !rootSession.gitBranch.isEmpty {
                     metaBadge(
-                        text: entry.gitBranch,
+                        text: rootSession.gitBranch,
                         icon: "arrow.triangle.branch",
                         color: .orange
                     )
                 }
-                if entry.userTurnCount > 0 {
+                if rootSession.userTurnCount > 0 {
                     metaBadge(
-                        text: "\(entry.userTurnCount)",
+                        text: "\(rootSession.userTurnCount)",
                         icon: "text.bubble",
                         color: .blue
                     )
                 }
-                if entry.outputTokens > 0 {
+                if rootSession.outputTokens > 0 {
                     metaBadge(
-                        text: "\(entry.inputTokens.formattedCount)/\(entry.outputTokens.formattedCount)",
+                        text: "\(rootSession.inputTokens.formattedCount)/\(rootSession.outputTokens.formattedCount)",
                         icon: "sparkle",
                         color: .green
                     )
                 }
-                if entry.hasSubagents {
+                if rootSession.hasSubagents {
                     metaBadge(
                         text: "agents",
                         icon: "person.2",
@@ -90,7 +98,7 @@ struct SessionRowView: View {
                     )
                 }
                 Spacer()
-                Text(Self.relativeTime(from: entry.lastActivityAt, to: now))
+                Text(Self.relativeTime(from: rootSession.lastActivityAt, to: now))
                     .font(.caption2)
                     .foregroundStyle(AnyShapeStyle(isSelected ? AnyShapeStyle(.white.opacity(0.5)) : AnyShapeStyle(.tertiary)))
             }
@@ -125,7 +133,7 @@ struct SessionRowView: View {
     }
 
     /// Friendly relative time without seconds-level precision.
-    private static func relativeTime(from date: Date, to now: Date) -> String {
+    static func relativeTime(from date: Date, to now: Date) -> String {
         let seconds = Int(now.timeIntervalSince(date))
         if seconds < 60 { return "just now" }
         let minutes = seconds / 60
